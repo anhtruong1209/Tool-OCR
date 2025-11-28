@@ -11,7 +11,7 @@ export interface Job {
   error?: string;
   startTime?: number;
   endTime?: number;
-  rootDirHandle?: FileSystemDirectoryHandle; // Root directory handle for saving files
+  rootDirHandle: FileSystemDirectoryHandle; // Root directory handle for saving files
 }
 
 export interface JobQueueConfig {
@@ -53,7 +53,10 @@ class JobQueue {
   }
 
   // Add job to queue
-  addJob(file: File, rootDirHandle?: FileSystemDirectoryHandle): string {
+  addJob(file: File, rootDirHandle: FileSystemDirectoryHandle): string {
+    if (!rootDirHandle) {
+      throw new Error('JobQueue requires a valid rootDirHandle to save files.');
+    }
     const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const job: Job = {
       id,
@@ -71,7 +74,7 @@ class JobQueue {
   // Set root directory handle for all pending jobs
   setRootDirectory(rootDirHandle: FileSystemDirectoryHandle): void {
     Array.from(this.jobs.values())
-      .filter(job => job.status === 'pending' && !job.rootDirHandle)
+      .filter(job => job.status === 'pending')
       .forEach(job => {
         job.rootDirHandle = rootDirHandle;
       });
@@ -153,7 +156,7 @@ class JobQueue {
 
       try {
         // Process the file with root directory handle
-        const result = await splitPdfByKeywords(job.file, "Mã số", job.rootDirHandle);
+        const result = await splitPdfByKeywords(job.file, job.rootDirHandle, "Mã số");
         
         clearInterval(progressInterval);
 

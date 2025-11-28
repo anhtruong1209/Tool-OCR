@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { FileToSave } from '../types';
 
 /**
@@ -48,7 +47,7 @@ export const canUseFileSystemAccess = (): boolean => {
 export const requestDirectoryPicker = async (): Promise<FileSystemDirectoryHandle | null> => {
   // Check if we can use File System Access API
   if (!canUseFileSystemAccess()) {
-    console.log('[FileSaver] Cannot use File System Access API in cross-origin iframe, will use ZIP download');
+    console.log('[FileSaver] Cannot use File System Access API in cross-origin iframe. ZIP fallback disabled.');
     return null;
   }
 
@@ -67,48 +66,12 @@ export const requestDirectoryPicker = async (): Promise<FileSystemDirectoryHandl
     
     // If cross-origin error, return null to use ZIP fallback
     if (error.message?.includes('Cross origin') || error.message?.includes('sub frames')) {
-      console.log('[FileSaver] Cross-origin error, will use ZIP download');
+      console.log('[FileSaver] Cross-origin error while opening directory picker. ZIP fallback disabled.');
       return null;
     }
     
     throw error;
   }
-};
-
-/**
- * Creates a ZIP file from files and downloads it
- */
-export const downloadFilesAsZip = async (
-  filesToSave: FileToSave[],
-  folderStructureJson?: string,
-  zipName: string = 'split-pdf-files.zip'
-): Promise<void> => {
-  console.log(`[FileSaver] Creating ZIP file with ${filesToSave.length} files...`);
-  const zip = new JSZip();
-  
-  // Add all files to ZIP with their folder structure
-  for (const fileInfo of filesToSave) {
-    const zipPath = `DNR/PHAT MSI & SAR THANG 11-2025/${fileInfo.path}/${fileInfo.filename}`;
-    zip.file(zipPath, fileInfo.bytes);
-  }
-  
-  // Add folder structure JSON if provided
-  if (folderStructureJson) {
-    zip.file('DNR/PHAT MSI & SAR THANG 11-2025/folder-structure.json', folderStructureJson);
-  }
-  
-  // Generate ZIP and download
-  const zipBlob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(zipBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = zipName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
-  console.log(`[FileSaver] Downloaded ZIP file: ${zipName} (${filesToSave.length} files)`);
 };
 
 /**

@@ -4,7 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 import { SplitDocument, SplitResultData } from '../types';
 import { convertPdfToImage } from './pdfUtils';
 import { GoogleGenAI } from "@google/genai";
-import { saveFilesToDirectory, downloadFilesAsZip } from './fileSaver';
+import { saveFilesToDirectory } from './fileSaver';
 
 // Ensure worker is set
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -310,8 +310,8 @@ CHỈ trả về JSON array, không có text giải thích nào khác.`;
 
 export const splitPdfByKeywords = async (
   file: File, 
-  keyword: string = "Mã số",
-  rootDirHandle?: FileSystemDirectoryHandle
+  rootDirHandle: FileSystemDirectoryHandle,
+  keyword: string = "Mã số"
 ): Promise<SplitResultData> => {
   try {
     // Initialize file storage for File System Access API
@@ -1096,17 +1096,11 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
 
     // 6. Save files - use File System Access API if available, otherwise download as ZIP
     if (filesToSave.length > 0) {
-      if (rootDirHandle) {
-        // Use File System Access API to save directly to folder
-        console.log(`[PDF Splitter] Saving ${filesToSave.length} files to local filesystem...`);
-        await saveFilesToDirectory(rootDirHandle, filesToSave, structureJson);
-      } else {
-        // Fallback: Download as ZIP file
-        console.log(`[PDF Splitter] Directory picker not available, downloading ${filesToSave.length} files as ZIP...`);
-        const zipName = `split-pdf-${Date.now()}.zip`;
-        await downloadFilesAsZip(filesToSave, structureJson, zipName);
-        console.log(`[PDF Splitter] ZIP file downloaded: ${zipName}`);
+      if (!rootDirHandle) {
+        throw new Error('Chưa có quyền truy cập thư mục đích. Vui lòng chọn thư mục lưu trữ trước khi tách file.');
       }
+      console.log(`[PDF Splitter] Saving ${filesToSave.length} files to local filesystem...`);
+      await saveFilesToDirectory(rootDirHandle, filesToSave, structureJson);
     } else {
       console.log(`[PDF Splitter] No files to save`);
     }

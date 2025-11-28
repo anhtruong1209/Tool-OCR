@@ -30,8 +30,23 @@ const App: React.FC = () => {
     try {
       if (docType === 'SPLIT') {
           // --- SPLITTER LOGIC ---
-          // No need to convert images for Gemini, we process PDF directly
-          const result = await splitPdfByKeywords(file);
+          let rootDirHandle: FileSystemDirectoryHandle;
+          try {
+            const handle = await requestDirectoryPicker();
+            if (!handle) {
+              throw new Error('Trình duyệt không hỗ trợ quyền truy cập thư mục. Vui lòng mở ứng dụng trong tab chính (không iframe) bằng Chrome/Edge mới nhất.');
+            }
+            rootDirHandle = handle;
+          } catch (pickerError: any) {
+            if (pickerError.name === 'AbortError') {
+              setStatus(ProcessingStatus.IDLE);
+              setErrorMsg(null);
+              return;
+            }
+            throw pickerError;
+          }
+
+          const result = await splitPdfByKeywords(file, rootDirHandle);
           setReportData(result);
           setStatus(ProcessingStatus.SUCCESS);
           // Generate a preview of first page just for visual confirmation
@@ -67,24 +82,25 @@ const App: React.FC = () => {
 
     // For SPLIT mode, try to request directory picker (optional)
     // If not available (e.g., in iframe), files will be downloaded as ZIP
-    let rootDirHandle: FileSystemDirectoryHandle | undefined;
+    let rootDirHandle: FileSystemDirectoryHandle;
     try {
-      rootDirHandle = await requestDirectoryPicker();
-      if (rootDirHandle) {
-        console.log('[App] Directory selected:', rootDirHandle.name);
-      } else {
-        console.log('[App] Directory picker not available, files will be downloaded as ZIP');
-        // Continue processing - files will be downloaded as ZIP instead
+      const handle = await requestDirectoryPicker();
+      if (!handle) {
+        throw new Error('Trình duyệt không hỗ trợ quyền truy cập thư mục. Vui lòng mở ứng dụng trong tab chính (không iframe) bằng Chrome/Edge mới nhất.');
       }
+      rootDirHandle = handle;
+      console.log('[App] Directory selected:', rootDirHandle.name);
     } catch (error: any) {
       if (error.name === 'AbortError') {
         // User cancelled directory picker
         console.log('[App] User cancelled directory selection');
+        setStatus(ProcessingStatus.IDLE);
         return;
       }
-      console.warn('[App] Error selecting directory, will use ZIP download:', error);
-      // Continue processing - files will be downloaded as ZIP instead
-      rootDirHandle = undefined;
+      console.warn('[App] Error selecting directory:', error);
+      setStatus(ProcessingStatus.ERROR);
+      setErrorMsg(error.message || 'Không thể truy cập thư mục đích.');
+      return;
     }
 
     // Add all files to job queue with root directory handle
