@@ -347,6 +347,7 @@ export const splitPdfByKeywords = async (
     let detectedBroadcastCode: string | null = null;
     let detectedServiceCode: string | null = null; // NTX, RTP, EGC
     
+    let hasBanTinNguonKeyword = false;
     if (process.env.API_KEY) {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const model = 'gemini-2.5-flash';
@@ -368,13 +369,20 @@ export const splitPdfByKeywords = async (
         const imagesToCheck = pagesToCheck.map(pageNum => base64Images[pageNum - 1]).filter(Boolean);
         
         if (imagesToCheck.length > 0) {
-          const prompt = `Bạn là trợ lý AI chuyên đọc tài liệu PDF.
+        const prompt = `Bạn là trợ lý AI chuyên đọc tài liệu PDF.
 
 Nhiệm vụ: Tìm "Mã bản tin đài xử lý" trong các trang được cung cấp.
 
 Tìm "Mã bản tin đài xử lý" và trích xuất:
 - Broadcast code: MET, NAV, SAR, WX, TUYEN (chỉ một trong các mã này)
 - Service code: NTX, RTP, EGC (nếu có)
+
+Ngoài ra, nếu trong trang có xuất hiện một trong các cụm từ sau (không phân biệt hoa/thường):
+- "Cục Khí tượng Thủy văn"
+- "Trung tâm dự báo Khí tượng Thủy văn"
+- "Cộng hòa xã hội chủ nghĩa Việt Nam"
+- "Độc lập - Tự do - Hạnh phúc"
+hãy đánh dấu hasBanTinNguon = true.
 
 Ví dụ:
 - "4710/2025/DNR-MET-RTP" → broadcastCode: "MET", serviceCode: "RTP"
@@ -384,7 +392,8 @@ Ví dụ:
 Trả về JSON:
 {
   "broadcastCode": "MET" hoặc "NAV" hoặc "SAR" hoặc "WX" hoặc "TUYEN" hoặc null,
-  "serviceCode": "NTX" hoặc "RTP" hoặc "EGC" hoặc null
+  "serviceCode": "NTX" hoặc "RTP" hoặc "EGC" hoặc null,
+  "hasBanTinNguon": true/false
 }
 
 CHỈ trả về JSON, không có text giải thích nào khác.`;
@@ -434,6 +443,10 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
                   }
                 }
                 
+                if (!hasBanTinNguonKeyword && typeof result.hasBanTinNguon !== 'undefined') {
+                  hasBanTinNguonKeyword = Boolean(result.hasBanTinNguon);
+                }
+                
                 // If we found both codes, we can stop
                 if (detectedBroadcastCode && detectedServiceCode) {
                   console.log(`[PDF Splitter] Found both codes on pages ${startPage}-${endPage}`);
@@ -459,7 +472,7 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
         startPage = endPage + 1;
       }
       
-      console.log(`[PDF Splitter] Detected broadcast code: ${detectedBroadcastCode}, service code: ${detectedServiceCode}`);
+      console.log(`[PDF Splitter] Detected broadcast code: ${detectedBroadcastCode}, service code: ${detectedServiceCode}, hasBanTinNguonKeyword: ${hasBanTinNguonKeyword}`);
     }
 
     // 4. STEP 2: OCR ALL pages to find "Mã số/Số" for splitting (old logic)
@@ -691,7 +704,7 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
     
     for (const doc of documents) {
       // Check if document code indicates TTNH
-      let hasTTNH = false;
+      let hasTTNH = hasBanTinNguonKeyword;
       if (doc.code) {
         const codeUpper = doc.code.toUpperCase();
         if (codeUpper.includes('TTNH') || codeUpper.includes('DBQG') || codeUpper.includes('04H00')) {

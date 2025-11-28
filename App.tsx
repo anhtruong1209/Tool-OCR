@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { convertPdfToImage } from './services/pdfUtils';
 import { analyzeDocument } from './services/geminiService';
 import { splitPdfByKeywords } from './services/pdfSplitter';
@@ -11,15 +11,78 @@ import { JobQueueViewer } from './components/JobQueueViewer';
 import { DocumentData, ProcessingStatus, DocumentType } from './types';
 import { jobQueue } from './services/jobQueue';
 import { requestDirectoryPicker } from './services/fileSaver';
-import { AlertCircle, BrainCircuit, Eye, FileText, Anchor, Layers, Scissors } from 'lucide-react';
+import { AlertCircle, BrainCircuit, Eye, FileText, Anchor, Layers, Scissors, FolderOpen, ShieldCheck } from 'lucide-react';
+
+type HandlePermissionState = 'prompt' | 'granted' | 'denied';
+
+const permissionMeta: Record<HandlePermissionState, { label: string; className: string; helper: string }> = {
+  granted: {
+    label: 'Đã cấp toàn quyền',
+    className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    helper: 'Ứng dụng có thể ghi file trực tiếp vào thư mục này.',
+  },
+  prompt: {
+    label: 'Chờ cấp quyền',
+    className: 'bg-amber-50 text-amber-700 border border-amber-200',
+    helper: 'Nhấn nút bên dưới để cho phép chỉnh sửa thư mục.',
+  },
+  denied: {
+    label: 'Đã từ chối',
+    className: 'bg-rose-50 text-rose-600 border border-rose-200',
+    helper: 'Bạn cần cấp lại quyền để hệ thống có thể lưu file.',
+  },
+};
+
+const queryDirPermission = async (handle: FileSystemDirectoryHandle): Promise<HandlePermissionState> => {
+  if ('queryPermission' in handle) {
+    const permission = await (handle as any).queryPermission({ mode: 'readwrite' });
+    return permission as HandlePermissionState;
+  }
+  return 'prompt';
+};
+
+const requestDirPermission = async (handle: FileSystemDirectoryHandle): Promise<HandlePermissionState> => {
+  if ('requestPermission' in handle) {
+    const permission = await (handle as any).requestPermission({ mode: 'readwrite' });
+    return permission as HandlePermissionState;
+  }
+  return 'prompt';
+};
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
-  const [docType, setDocType] = useState<DocumentType>('INVOICE');
+  const [docType, setDocType] = useState<DocumentType>('SPLIT');
   const [fileName, setFileName] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [reportData, setReportData] = useState<DocumentData | null>(null);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [directoryInfo, setDirectoryInfo] = useState<{ name: string; permission: HandlePermissionState } | null>(null);
+  const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  const currentPermission = directoryInfo?.permission ?? 'prompt';
+  const permissionBadgeLabel = directoryInfo ? permissionMeta[currentPermission].label : 'Chưa chọn thư mục';
+  const permissionBadgeClass = directoryInfo ? permissionMeta[currentPermission].className : 'bg-slate-100 text-slate-500 border border-slate-200';
+  const permissionHelperText = directoryInfo ? permissionMeta[currentPermission].helper : 'Chọn thư mục đích để kích hoạt nút yêu cầu quyền ghi.';
+
+  const syncDirectoryHandle = useCallback(async (handle: FileSystemDirectoryHandle) => {
+    dirHandleRef.current = handle;
+    const permission = await queryDirPermission(handle);
+    setDirectoryInfo({ name: handle.name, permission });
+  }, []);
+
+  const handleRequestEditPermission = useCallback(async () => {
+    if (!dirHandleRef.current) {
+      setErrorMsg('Vui lòng chọn thư mục lưu kết quả trước khi cấp quyền.');
+      return;
+    }
+    try {
+      const permission = await requestDirPermission(dirHandleRef.current);
+      setDirectoryInfo({ name: dirHandleRef.current.name, permission });
+      setErrorMsg(null);
+    } catch (err: any) {
+      setStatus(ProcessingStatus.ERROR);
+      setErrorMsg(err.message || 'Không thể yêu cầu quyền chỉnh sửa thư mục.');
+    }
+  }, []);
   
   const handleFileSelect = useCallback(async (file: File) => {
     setFileName(file.name);
@@ -37,6 +100,7 @@ const App: React.FC = () => {
               throw new Error('Trình duyệt không hỗ trợ quyền truy cập thư mục. Vui lòng mở ứng dụng trong tab chính (không iframe) bằng Chrome/Edge mới nhất.');
             }
             rootDirHandle = handle;
+            await syncDirectoryHandle(rootDirHandle);
           } catch (pickerError: any) {
             if (pickerError.name === 'AbortError') {
               setStatus(ProcessingStatus.IDLE);
@@ -71,7 +135,7 @@ const App: React.FC = () => {
       setStatus(ProcessingStatus.ERROR);
       setErrorMsg(error.message || 'Đã có lỗi xảy ra trong quá trình xử lý.');
     }
-  }, [docType]);
+  }, [docType, syncDirectoryHandle]);
 
   const handleMultipleFilesSelect = useCallback(async (files: File[]) => {
     if (docType !== 'SPLIT') {
@@ -89,6 +153,7 @@ const App: React.FC = () => {
         throw new Error('Trình duyệt không hỗ trợ quyền truy cập thư mục. Vui lòng mở ứng dụng trong tab chính (không iframe) bằng Chrome/Edge mới nhất.');
       }
       rootDirHandle = handle;
+      await syncDirectoryHandle(rootDirHandle);
       console.log('[App] Directory selected:', rootDirHandle.name);
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -110,7 +175,7 @@ const App: React.FC = () => {
     
     // Show job queue viewer
     setStatus(ProcessingStatus.ANALYZING);
-  }, [docType, handleFileSelect]);
+  }, [docType, handleFileSelect, syncDirectoryHandle]);
 
   const handleReset = () => {
     setStatus(ProcessingStatus.IDLE);
@@ -118,6 +183,8 @@ const App: React.FC = () => {
     setReportData(null);
     setPreviewUrls([]);
     setErrorMsg(null);
+    setDirectoryInfo(null);
+    dirHandleRef.current = null;
   };
 
   return (
@@ -165,70 +232,133 @@ const App: React.FC = () => {
             <div className="flex-grow flex flex-col items-center justify-center p-6 overflow-y-auto">
                 
                 {status === ProcessingStatus.IDLE && (
-                    <div className="text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700 w-full max-w-4xl bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50">
-                        <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">
-                            Hệ thống Xử Lý Tài Liệu Hàng Hải
-                        </h2>
-                        <p className="text-slate-600 max-w-xl mx-auto mb-8 font-medium">
-                            Chọn loại hình xử lý bạn muốn thực hiện
-                        </p>
+                    <div className="w-full max-w-6xl mx-auto space-y-8">
+                      <section className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50">
+                        <div className="mx-auto max-w-3xl">
+                          <p className="text-xs uppercase tracking-[0.4em] text-slate-400 mb-3">Vishipel AI</p>
+                          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3 tracking-tight">
+                              Bộ Tách PDF Tự Động
+                          </h2>
+                          <p className="text-slate-600 mb-8 font-medium">
+                              Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo từ khóa.
+                          </p>
+                        </div>
 
                         {/* Document Type Selector */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                            <button 
-                              onClick={() => setDocType('INVOICE')}
-                              className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-                                docType === 'INVOICE' 
-                                  ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-200 scale-105' 
-                                  : 'border-slate-200 bg-white hover:border-blue-300 text-slate-600 hover:scale-105'
-                              }`}
-                            >
-                                <div className={`p-2 rounded-full ${docType === 'INVOICE' ? 'bg-blue-200' : 'bg-slate-100'}`}>
-                                  <FileText className="w-6 h-6" />
-                                </div>
-                                <span className="font-bold">Hóa Đơn GTGT</span>
-                                <span className="text-xs text-slate-400 font-normal">Trích xuất bảng & Export Excel</span>
-                            </button>
-                            <button 
-                              onClick={() => setDocType('INCIDENT')}
-                              className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
-                                docType === 'INCIDENT' 
-                                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md ring-2 ring-indigo-200 scale-105' 
-                                  : 'border-slate-200 bg-white hover:border-indigo-300 text-slate-600 hover:scale-105'
-                              }`}
-                            >
-                                <div className={`p-2 rounded-full ${docType === 'INCIDENT' ? 'bg-indigo-200' : 'bg-slate-100'}`}>
-                                  <Anchor className="w-6 h-6" />
-                                </div>
-                                <span className="font-bold">Báo Cáo Sự Cố</span>
-                                <span className="text-xs text-slate-400 font-normal">Xử lý ma trận bảng & tọa độ</span>
-                            </button>
-                            
+                            {/*
+                            <button ...>...</button>
+                            <button ...>...</button>
+                            */}
                             <button 
                               onClick={() => setDocType('SPLIT')}
-                              className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${
+                              className={`p-5 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
                                 docType === 'SPLIT' 
-                                  ? 'border-purple-600 bg-purple-50 text-purple-700 shadow-md ring-2 ring-purple-200 scale-105' 
-                                  : 'border-slate-200 bg-white hover:border-purple-300 text-slate-600 hover:scale-105'
+                                  ? 'border-purple-600 bg-gradient-to-br from-purple-50 via-white to-purple-100 text-purple-800 shadow-md ring-2 ring-purple-200 scale-[1.02]' 
+                                  : 'border-slate-200 bg-white hover:border-purple-300 text-slate-600 hover:scale-[1.02]'
                               }`}
                             >
-                                <div className={`p-2 rounded-full ${docType === 'SPLIT' ? 'bg-purple-200' : 'bg-slate-100'}`}>
-                                  <Scissors className="w-6 h-6" />
+                                <div className={`p-3 rounded-2xl ${docType === 'SPLIT' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
+                                  <Scissors className="w-7 h-7" />
                                 </div>
-                                <span className="font-bold">Tách File PDF</span>
-                                <span className="text-xs text-slate-400 font-normal">Cắt file tự động</span>
+                                <span className="font-bold text-lg">Tách File PDF</span>
+                                <span className="text-xs text-slate-400 font-normal text-center">Cắt file tự động theo danh sách từ khóa</span>
                             </button>
                         </div>
-                        
-                        <div className="bg-white p-2 rounded-2xl shadow-inner border border-slate-100">
+                      </section>
+
+                      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start">
+                        <div className="rounded-3xl bg-white shadow-2xl border border-slate-100 p-6 flex flex-col gap-6">
+                          <div className="flex flex-col gap-2 text-left">
+                            <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Upload</p>
+                            <h3 className="text-2xl font-semibold text-slate-900">Tải lên nhiều file PDF</h3>
+                            <p className="text-sm text-slate-500">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
+                          </div>
+                          <div className="bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200">
                             <UploadArea 
                               onFileSelect={handleFileSelect}
                               onMultipleFilesSelect={handleMultipleFilesSelect}
                               multiple={docType === 'SPLIT'}
                             />
+                          </div>
+                          <div className="text-xs text-slate-400 flex items-center gap-2">
+                            <span className="inline-flex w-2 h-2 rounded-full bg-slate-300"></span>
+                            Chưa có file nào được thêm vào – chọn file PDF để bắt đầu.
+                          </div>
                         </div>
-                        
-                        {docType === 'SPLIT' && <JobQueueViewer onReset={handleReset} />}
+
+                        {docType === 'SPLIT' && (
+                          <div className="space-y-5">
+                            <div className="p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 text-white shadow-2xl border border-white/10 text-left min-h-[240px] flex flex-col">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-white/15 p-2 rounded-xl">
+                                  <FolderOpen size={20} />
+                                </div>
+                                <div>
+                                  <p className="text-xs uppercase tracking-[0.3em] text-white/60">Hướng dẫn</p>
+                                  <h3 className="text-lg font-semibold">Thư mục lưu kết quả</h3>
+                                </div>
+                              </div>
+                              <p className="text-sm text-white/80 mb-4 flex-1">
+                                {directoryInfo
+                                  ? `Hệ thống đã ghi nhớ thư mục "${directoryInfo.name}". Mở File Explorer và truy cập thư mục này để theo dõi file vừa tách.`
+                                  : 'Ngay khi chọn thư mục lưu, ứng dụng sẽ ghi nhớ và hiển thị hướng dẫn cụ thể tại đây.'}
+                              </p>
+                              <ul className="text-sm text-white/80 space-y-2 list-disc pl-5">
+                                <li>Tìm thư mục vừa chọn trong phần Quick Access.</li>
+                                <li>File được gom vào thư mục con trùng tên từ khóa.</li>
+                                <li>Giữ tab mở để hệ thống tiếp tục ghi file.</li>
+                              </ul>
+                            </div>
+                            <div className="p-5 rounded-3xl bg-white shadow-2xl border border-slate-100">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-slate-100 p-2 rounded-xl">
+                                    <ShieldCheck size={20} className="text-slate-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Quyền truy cập</p>
+                                    <h3 className="text-lg font-semibold text-slate-900">Chỉnh sửa thư mục</h3>
+                                  </div>
+                                </div>
+                                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${permissionBadgeClass}`}>
+                                  {permissionBadgeLabel}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-600 mb-4">
+                                {permissionHelperText}
+                              </p>
+                              <button
+                                onClick={handleRequestEditPermission}
+                                disabled={!dirHandleRef.current}
+                                className={`w-full px-4 py-2 rounded-xl font-semibold transition-colors ${
+                                  dirHandleRef.current
+                                    ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                    : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                                }`}
+                              >
+                                Cấp quyền chỉnh sửa thư mục
+                              </button>
+                              {directoryInfo?.permission === 'denied' && (
+                                <p className="text-xs text-rose-500 mt-3">
+                                  Trình duyệt đã từ chối quyền. Nhấn lại nút trên và chấp nhận pop-up để tiếp tục lưu file tự động.
+                                </p>
+                              )}
+                              {directoryInfo?.permission === 'granted' && (
+                                <p className="text-xs text-emerald-600 mt-3">
+                                  Bạn có thể truy cập thư mục "{directoryInfo.name}" bất cứ lúc nào để kiểm tra tiến độ tách file.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {docType === 'SPLIT' && (
+                          <div className="lg:col-span-2 bg-white/80 border border-slate-100 rounded-3xl shadow-xl p-4">
+                            <JobQueueViewer onReset={handleReset} />
+                          </div>
+                        )}
+                      </section>
                     </div>
                 )}
 
