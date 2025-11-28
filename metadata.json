@@ -1,0 +1,5 @@
+{
+  "name": "VISHIPEL AI - OCR & Data Extraction",
+  "description": "Ứng dụng hỗ trợ kế toán tự động trích xuất dữ liệu từ hóa đơn PDF bằng công nghệ Gemini 2.5 Flash.",
+  "requestFramePermissions": []
+}
