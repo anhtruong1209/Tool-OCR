@@ -75,6 +75,37 @@
           ]
         },
         {
+          "name": "BAN TIN NGUON",
+          "type": "folder",
+          "children": [
+            {
+              "name": "MET",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "NAV",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "SAR",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "WX",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "TUYEN",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
           "name": "DICH VU RTP",
           "type": "folder",
           "children": [
@@ -338,37 +369,6 @@
                   "children": []
                 }
               ]
-            }
-          ]
-        },
-        {
-          "name": "BAN TIN NGUON",
-          "type": "folder",
-          "children": [
-            {
-              "name": "MET",
-              "type": "folder",
-              "children": []
-            },
-            {
-              "name": "NAV",
-              "type": "folder",
-              "children": []
-            },
-            {
-              "name": "SAR",
-              "type": "folder",
-              "children": []
-            },
-            {
-              "name": "WX",
-              "type": "folder",
-              "children": []
-            },
-            {
-              "name": "TUYEN",
-              "type": "folder",
-              "children": []
             }
           ]
         }

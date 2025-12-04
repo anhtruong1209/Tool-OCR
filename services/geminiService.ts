@@ -6,7 +6,9 @@ import {
   DocumentType,
   BroadcastAndServiceCode,
   PageCodeResult,
-  BanTinNguonKeywords
+  BanTinNguonKeywords,
+  PDFAnalysisResult,
+  PageAnalysis
 } from '../types';
 
 // --- BAN TIN NGUON KEYWORDS CONFIG ---
@@ -573,25 +575,28 @@ export const detectSignatureOnPage = async (base64: string): Promise<boolean> =>
 
     const prompt = `Bạn là trợ lý AI chuyên phân tích hình ảnh PDF.
 
-Nhiệm vụ: Xác định xem trang này có chữ ký (signature) hay không.
+Nhiệm vụ: Xác định xem trang này có TÊN NGƯỜI hay không.
 
-Chữ ký có thể là:
+Tên người thường xuất hiện ở:
+- Phần chữ ký: "Vũ Anh Tuấn", "Nguyễn Xuân Hiến", "Phạm Thị Châm"
+- Phần soát tin: "Soát tin: Trần Như Quỳnh"
+- Phần dự báo viên: "Dự báo viên: Phạm Thị Châm"
+- Chức danh kèm tên: "KT. GIÁM ĐỐC / Nguyễn Xuân Hiến"
+- Phần ký tên: "P. TRƯỞNG PHÒNG / Vũ Anh Tuấn"
 
-1. **Chữ ký viết tay** (handwritten signature)
-2. **Chữ ký điện tử** (digital signature) với các dấu hiệu:
-   - Có chức danh: "KT. GIÁM ĐỐC", "PHÓ GIÁM ĐỐC", "GIÁM ĐỐC", "TRƯỞNG PHÒNG", "P. TRƯỞNG PHÒNG"
-   - Có tên người ký (ví dụ: "Nguyễn Xuân Hiến", "Vũ Anh Tuấn", "Phạm Phương Chi")
-   - Thường ở phần dưới của trang
-   - Có thể có text "Đã ký" hoặc "Ký bởi"
+**Đặc điểm tên người Việt Nam:**
+- Có 2-4 từ
+- Chữ cái đầu viết hoa
+- Ví dụ: "Vũ Anh Tuấn", "Trần Như Quỳnh", "Nguyễn Xuân Hiến", "Phạm Thị Châm", vv
 
-**Lưu ý:** Nếu trang chỉ có header/footer thông thường (không phải chữ ký), trả về false.
+**QUAN TRỌNG:** Chỉ cần tìm thấy TÊN NGƯỜI (không cần chữ ký viết tay) là trả về true.
 
-Nếu trang có chữ ký (viết tay HOẶC điện tử), trả về:
+Nếu trang có TÊN NGƯỜI, trả về:
 {
   "hasSignature": true
 }
 
-Nếu KHÔNG có chữ ký, trả về:
+Nếu KHÔNG có TÊN NGƯỜI, trả về:
 {
   "hasSignature": false
 }
@@ -784,4 +789,193 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
     console.warn('[Gemini Service] Log page detection failed:', error);
     return false;
   }
+};
+
+/**
+ * OPTIMIZED: Analyze entire PDF in single/few API calls
+ * Combines all detection: broadcast code, service code, document codes, person names, LOG pages
+ * 
+ * @param base64Images - Array of base64 encoded images
+ * @returns Complete PDF analysis with all information
+ */
+export const analyzePDFComplete = async (
+  base64Images: string[]
+): Promise<PDFAnalysisResult> => {
+  if (!process.env.API_KEY) {
+    throw new Error("API Key chưa được cấu hình.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const model = 'gemini-2.5-flash';
+
+  // Gemini 2.5 Flash supports ~20 images per request
+  const BATCH_SIZE = 15;
+  const allBatchResults: PDFAnalysisResult[] = [];
+
+  // Process in batches
+  for (let batchStart = 0; batchStart < base64Images.length; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, base64Images.length);
+    const batchImages = base64Images.slice(batchStart, batchEnd);
+    const startPageNum = batchStart + 1;
+
+    console.log(`[Gemini Service] Analyzing batch: pages ${startPageNum}-${startPageNum + batchImages.length - 1} (${batchImages.length} pages)`);
+
+    const prompt = `Bạn là trợ lý AI phân tích PDF chuyên nghiệp.
+
+NHIỆM VỤ: Phân tích TẤT CẢ các trang và trả về JSON với đầy đủ thông tin.
+
+1. **BROADCAST CODE** (Mã phát sóng):
+   Tìm trong "Mã bản tin đài xử lý" hoặc header
+   Các giá trị: MET, NAV, SAR, WX, TUYEN
+   
+2. **SERVICE CODE** (Mã dịch vụ):
+   Tìm trong "Mã bản tin đài xử lý" hoặc header
+   Các giá trị: NTX, RTP, EGC
+
+3. **MỖI TRANG** - Phân tích và trả về:
+   a) **Mã số (code)**: 
+      - QT.MSI-BM.01, QT.MSI-BM.02, QT.MSI-BM.03, QT.MSI-BM.04
+      - KTKS.MSI.TC-BM.01, KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03
+      - TTNH-04H00/ĐBQG, TTNH-04H00, ĐBQG
+      - Hoặc bất kỳ mã nào có pattern: chữ + số + dấu
+      - Nếu KHÔNG tìm thấy mã → trả về null
+   
+   b) **Có tên người không (hasPersonName)**:
+      - Tìm tên người Việt Nam (2-4 từ, chữ cái đầu viết hoa)
+      - Ví dụ: "Vũ Anh Tuấn", "Trần Như Quỳnh", "Nguyễn Xuân Hiến", "Phạm Thị Châm"
+      - Tìm trong: "Soát tin:", "Dự báo viên:", "KT. GIÁM ĐỐC", "P. TRƯỞNG PHÒNG", chữ ký
+      - Nếu có → true, nếu không → false
+   
+   c) **Tên người (personName)**: 
+      - Nếu có tên người, trả về tên đầy đủ
+      - Nếu không có → null
+   
+   d) **Là trang LOG không (isLogPage)**:
+      - Nếu trang KHÔNG có mã code nhận diện được (QT, KTKS, TTNH, etc.) → true
+      - Nếu trang có mã code → false
+
+**LƯU Ý QUAN TRỌNG:**
+- Số trang bắt đầu từ ${startPageNum}
+- Phải phân tích TẤT CẢ ${batchImages.length} trang
+- Mỗi trang phải có đầy đủ thông tin
+
+Trả về JSON format:
+{
+  "broadcastCode": "MET" hoặc "NAV" hoặc "SAR" hoặc "WX" hoặc "TUYEN" hoặc null,
+  "serviceCode": "NTX" hoặc "RTP" hoặc "EGC" hoặc null,
+  "pages": [
+    {
+      "page": ${startPageNum},
+      "code": "QT.MSI-BM.01" hoặc null,
+      "hasPersonName": true hoặc false,
+      "personName": "Vũ Anh Tuấn" hoặc null,
+      "isLogPage": false
+    },
+    ...
+  ]
+}
+
+CHỈ trả về JSON, không có text giải thích nào khác.`;
+
+    // Prepare content parts with all images in batch
+    const contentParts: any[] = batchImages.map(img => ({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: img,
+      },
+    }));
+
+    contentParts.push({ text: prompt });
+
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: {
+          parts: contentParts,
+        },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0,
+        },
+      });
+
+      const jsonText = response.text?.trim();
+      if (!jsonText) {
+        console.error(`[Gemini Service] No response for batch ${startPageNum}-${startPageNum + batchImages.length - 1}`);
+        // Return empty result for this batch
+        allBatchResults.push({
+          broadcastCode: null,
+          serviceCode: null,
+          pages: batchImages.map((_, idx) => ({
+            page: startPageNum + idx,
+            code: null,
+            hasPersonName: false,
+            isLogPage: true
+          }))
+        });
+        continue;
+      }
+
+      let batchResult: PDFAnalysisResult;
+      try {
+        batchResult = JSON.parse(jsonText);
+      } catch (parseError) {
+        console.error(`[Gemini Service] JSON parse error for batch ${startPageNum}:`, jsonText);
+        // Return empty result for this batch
+        allBatchResults.push({
+          broadcastCode: null,
+          serviceCode: null,
+          pages: batchImages.map((_, idx) => ({
+            page: startPageNum + idx,
+            code: null,
+            hasPersonName: false,
+            isLogPage: true
+          }))
+        });
+        continue;
+      }
+
+      allBatchResults.push(batchResult);
+
+    } catch (error) {
+      console.error(`[Gemini Service] Error analyzing batch ${startPageNum}:`, error);
+      // Return empty result for this batch
+      allBatchResults.push({
+        broadcastCode: null,
+        serviceCode: null,
+        pages: batchImages.map((_, idx) => ({
+          page: startPageNum + idx,
+          code: null,
+          hasPersonName: false,
+          isLogPage: true
+        }))
+      });
+    }
+  }
+
+  // Merge results from all batches
+  let finalBroadcastCode: 'MET' | 'NAV' | 'SAR' | 'WX' | 'TUYEN' | null = null;
+  let finalServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
+  const allPages: PageAnalysis[] = [];
+
+  for (const batchResult of allBatchResults) {
+    // Take first non-null broadcast/service code
+    if (!finalBroadcastCode && batchResult.broadcastCode) {
+      finalBroadcastCode = batchResult.broadcastCode;
+    }
+    if (!finalServiceCode && batchResult.serviceCode) {
+      finalServiceCode = batchResult.serviceCode;
+    }
+
+    // Collect all pages
+    allPages.push(...batchResult.pages);
+  }
+
+  console.log(`[Gemini Service] Analysis complete: ${allPages.length} pages, broadcast: ${finalBroadcastCode}, service: ${finalServiceCode}`);
+
+  return {
+    broadcastCode: finalBroadcastCode,
+    serviceCode: finalServiceCode,
+    pages: allPages
+  };
 };

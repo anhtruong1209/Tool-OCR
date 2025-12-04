@@ -4,10 +4,7 @@ import { SplitDocument, SplitResultData } from '../types';
 import { convertPdfToImage } from './pdfUtils';
 import { saveFilesToDirectory } from './fileSaver';
 import {
-  detectBroadcastAndServiceCode,
-  extractDocumentCodes,
-  detectLogPage,
-  detectSignatureOnPage
+  analyzePDFComplete
 } from './geminiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -91,25 +88,27 @@ export const splitPdfByKeywords = async (
 
     const base64Images = await convertPdfToImage(file, -1);
 
-    // Detect broadcast/service codes using geminiService
-    const { broadcastCode, serviceCode } = await detectBroadcastAndServiceCode(base64Images);
-    const detectedBroadcastCode = broadcastCode;
-    const detectedServiceCode = serviceCode;
+    // OPTIMIZED: Single API call for all detection
+    console.log(`[PDF Splitter] Analyzing ${base64Images.length} pages with single API call...`);
+    const analysis = await analyzePDFComplete(base64Images);
 
-    // Extract document codes using geminiService (for metadata: broadcast code, service code, filename)
-    const pageCodes = await extractDocumentCodes(base64Images, keywords);
+    const detectedBroadcastCode = analysis.broadcastCode;
+    const detectedServiceCode = analysis.serviceCode;
 
-    // Detect signatures on all pages to determine document boundaries
-    const signatureResults = await Promise.all(
-      base64Images.map(async (img, idx) => ({
-        page: idx + 1,
-        hasSignature: await detectSignatureOnPage(img)
-      }))
-    );
+    // Extract data from analysis
+    const pageCodes = analysis.pages.map(p => ({ page: p.page, code: p.code }));
+    const signaturePages = analysis.pages
+      .filter(p => p.hasPersonName)
+      .map(p => p.page);
+    const logPages = analysis.pages
+      .filter(p => p.isLogPage)
+      .map(p => p.page);
 
-    const signaturePages = signatureResults
-      .filter(r => r.hasSignature)
-      .map(r => r.page);
+    console.log(`[PDF Splitter] Analysis complete:`);
+    console.log(`  - Broadcast: ${detectedBroadcastCode}, Service: ${detectedServiceCode}`);
+    console.log(`  - Signature pages: ${signaturePages.join(', ') || 'NONE'}`);
+    console.log(`  - LOG pages: ${logPages.join(', ') || 'NONE'}`);
+
 
     // Split documents based on signature pages
     const documents: SplitDocument[] = [];
@@ -148,8 +147,30 @@ export const splitPdfByKeywords = async (
         pageCount: signaturePage - currentDocStartPage + 1
       });
 
-      // Next document starts after signature page
-      currentDocStartPage = signaturePage + 1;
+      // Check pages after signature for LOG content
+      // LOG pages should be extracted separately, not become new documents
+      let nextPage = signaturePage + 1;
+      while (nextPage <= numPages) {
+        const pageImage = base64Images[nextPage - 1];
+        if (!pageImage) break;
+
+        try {
+          const isLog = false; // OLD: await detectLogPage(pageImage) - now using logPages from analysis
+          if (isLog) {
+            // This is a LOG page, skip it (will be extracted later in the LOG extraction phase)
+            nextPage++;
+          } else {
+            // Not a LOG page, this is the start of the next document
+            break;
+          }
+        } catch (error) {
+          // If detection fails, assume it's not a LOG page and break
+          break;
+        }
+      }
+
+      // Next document starts after signature page AND any LOG pages
+      currentDocStartPage = nextPage;
     }
 
     // Handle remaining pages after last signature (if any)
@@ -200,57 +221,69 @@ export const splitPdfByKeywords = async (
       });
     }
 
+    console.log(`[PDF Splitter] Created ${documents.length} documents:`);
+    documents.forEach((doc, idx) => {
+      console.log(`  Doc ${idx + 1}: pages ${doc.startPage}-${doc.endPage}, code: "${doc.code || 'NONE'}", filename: "${doc.filename}"`);
+    });
+
     const sourcePdfDoc = await PDFDocument.load(arrayBuffer);
 
     const getFolderPath = (code: string | undefined): string | null => {
       if (!code) return null;
 
       const codeUpper = code.toUpperCase();
+      const broadcastCode = detectedBroadcastCode || 'MET';
 
-      if (codeUpper.includes('QT') && (codeUpper.includes('.01') || codeUpper.includes('01'))) {
-        const broadcastCode = detectedBroadcastCode || 'MET';
+      // Check if this is QT or KTKS document
+      const hasQT = codeUpper.includes('QT');
+      const hasKTKS = codeUpper.includes('KTKS');
+
+      // QT.01 → COVER
+      if (hasQT && (codeUpper.includes('.01') || codeUpper.includes('01'))) {
         return `COVER/COVER/${broadcastCode}`;
       }
 
-      if (codeUpper.includes('KTKS') && (codeUpper.includes('.01') || codeUpper.includes('01'))) {
+      // KTKS.01 → COVER/KTKSTC BM 01
+      if (hasKTKS && (codeUpper.includes('.01') || codeUpper.includes('01'))) {
         const validCodes = ['MET', 'NAV', 'SAR', 'WX'];
-        const broadcastCode = (detectedBroadcastCode && validCodes.includes(detectedBroadcastCode)) ? detectedBroadcastCode : 'MET';
-        return `COVER/KTKSTC BM 01/${broadcastCode}`;
+        const bc = (detectedBroadcastCode && validCodes.includes(detectedBroadcastCode)) ? detectedBroadcastCode : 'MET';
+        return `COVER/KTKSTC BM 01/${bc}`;
       }
 
-      const isTTNH = codeUpper.includes('TTNH') || codeUpper.includes('DBQG') || codeUpper.includes('04H00');
-      if (isTTNH) {
-        const broadcastCode = detectedBroadcastCode || 'MET';
+      // If NOT QT and NOT KTKS → BAN TIN NGUON (simplified rule)
+      if (!hasQT && !hasKTKS) {
         return `BAN TIN NGUON/${broadcastCode}`;
       }
 
+      // QT/KTKS with service code routing
       let basePath = '';
       let serviceFolder = '';
 
       if (detectedServiceCode === 'EGC') {
         serviceFolder = 'DICH VU EGC';
-        if (codeUpper.includes('QT') && (codeUpper.includes('.02') || codeUpper.includes('02'))) {
+        if (hasQT && (codeUpper.includes('.02') || codeUpper.includes('02'))) {
           basePath = 'BAN TIN NGUON DA DUOC XU LY EGC';
-        } else if (codeUpper.includes('KTKS') && (codeUpper.includes('.02') || codeUpper.includes('02'))) {
+        } else if (hasKTKS && (codeUpper.includes('.02') || codeUpper.includes('02'))) {
           basePath = 'KTKS TAI CHO BAN TIN NGUON XU LY EGC';
         } else {
-          return null;
+          // Unknown EGC type → fallback to BAN TIN NGUON
+          return `BAN TIN NGUON/${broadcastCode}`;
         }
       } else if (detectedServiceCode === 'NTX' || detectedServiceCode === 'RTP') {
         serviceFolder = detectedServiceCode === 'NTX' ? 'DICH VU NTX' : 'DICH VU RTP';
 
         if (codeUpper.includes('.02') || codeUpper.includes('02')) {
-          if (codeUpper.includes('QT') && (codeUpper.includes('.02') || codeUpper.includes('02'))) {
+          if (hasQT) {
             basePath = 'BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY';
-          } else if (codeUpper.includes('KTKS') && (codeUpper.includes('.02') || codeUpper.includes('02'))) {
+          } else if (hasKTKS) {
             basePath = 'BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY';
           } else {
-            return null;
+            return `BAN TIN NGUON/${broadcastCode}`;
           }
         } else if (codeUpper.includes('.03') || codeUpper.includes('03')) {
-          if (codeUpper.includes('QT') && (codeUpper.includes('.03') || codeUpper.includes('03'))) {
+          if (hasQT) {
             basePath = 'BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT';
-          } else if (codeUpper.includes('KTKS') && (codeUpper.includes('.03') || codeUpper.includes('03'))) {
+          } else if (hasKTKS) {
             basePath = 'BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT';
           } else {
             basePath = 'BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT';
@@ -258,15 +291,15 @@ export const splitPdfByKeywords = async (
         } else if (codeUpper.includes('.04') || codeUpper.includes('04')) {
           basePath = 'KIEM TRA KIEM SOAT SAU PHAT';
         } else {
-          return null;
+          // Unknown type → fallback to BAN TIN NGUON
+          return `BAN TIN NGUON/${broadcastCode}`;
         }
       } else {
-        return null;
+        // No service code → fallback to BAN TIN NGUON
+        return `BAN TIN NGUON/${broadcastCode}`;
       }
 
-      const broadcastCode = detectedBroadcastCode || 'MET';
       basePath = `${basePath}/${broadcastCode}`;
-
       return `${serviceFolder}/${basePath}`;
     };
 
@@ -291,14 +324,21 @@ export const splitPdfByKeywords = async (
     const documentIsTTNH = new Map<string, boolean>();
 
     for (const doc of documents) {
+      const folderPath = getFolderPath(doc.code);
+      console.log(`[PDF Splitter] Doc "${doc.filename}" → Folder: "${folderPath || 'NULL'}"`);
+
       let hasTTNH = false;
       if (doc.code) {
         const codeUpper = doc.code.toUpperCase();
-        if (codeUpper.includes('TTNH') || codeUpper.includes('DBQG') || codeUpper.includes('04H00')) {
+        // Only pure BAN TIN NGUON codes (TTNH, DBQG, 04H00) WITHOUT QT/KTKS
+        const hasQTorKTKS = codeUpper.includes('QT') || codeUpper.includes('KTKS');
+        if (!hasQTorKTKS && (codeUpper.includes('TTNH') || codeUpper.includes('DBQG') || codeUpper.includes('04H00'))) {
           hasTTNH = true;
         }
       }
+
       documentIsTTNH.set(doc.id, hasTTNH);
+      console.log(`[PDF Splitter] Doc "${doc.filename}" → Is pure BAN TIN NGUON: ${hasTTNH}`);
     }
 
     for (const doc of documents) {
@@ -353,7 +393,7 @@ export const splitPdfByKeywords = async (
 
               const contentRatio = nonWhitePixels / totalPixels;
               if (contentRatio > 0.1) {
-                const isLogPage = await detectLogPage(imageBase64);
+                const isLogPage = logPages.includes(j); // Use logPages from analysis instead of API call
                 if (isLogPage) {
                   logPagesInDoc.push(j);
                   continue;

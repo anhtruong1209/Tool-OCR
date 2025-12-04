@@ -162,6 +162,20 @@ export interface BanTinNguonKeywords {
   textPatterns: string[];
 }
 
+export interface PageAnalysis {
+  page: number;
+  code: string | null;           // QT.MSI-BM.01, TTNH-04H00, etc.
+  hasPersonName: boolean;         // Có tên người không (điểm cắt)
+  personName?: string;            // Tên người nếu có
+  isLogPage: boolean;             // Trang LOG (không có code nhận diện được)
+}
+
+export interface PDFAnalysisResult {
+  broadcastCode: 'MET' | 'NAV' | 'SAR' | 'WX' | 'TUYEN' | null;
+  serviceCode: 'NTX' | 'RTP' | 'EGC' | null;
+  pages: PageAnalysis[];
+}
+
 export interface SplitDocument {
   id: string;
   filename: string;
