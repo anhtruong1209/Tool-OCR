@@ -575,13 +575,18 @@ export const detectSignatureOnPage = async (base64: string): Promise<boolean> =>
 
 Nhiệm vụ: Xác định xem trang này có chữ ký (signature) hay không.
 
-Chữ ký thường có:
-- Tên người ký (ví dụ: "Vũ Anh Tuấn", "Phạm Phương Chi")
-- Chức danh (ví dụ: "P. TRƯỞNG PHÒNG", "TRƯỞNG PHÒNG DỰ BÁO")
-- Có thể có chữ ký viết tay hoặc chữ ký điện tử
-- Thường ở phần dưới của trang
+Chữ ký có thể là:
 
-Nếu trang có chữ ký, trả về:
+1. **Chữ ký viết tay** (handwritten signature)
+2. **Chữ ký điện tử** (digital signature) với các dấu hiệu:
+   - Có chức danh: "KT. GIÁM ĐỐC", "PHÓ GIÁM ĐỐC", "GIÁM ĐỐC", "TRƯỞNG PHÒNG", "P. TRƯỞNG PHÒNG"
+   - Có tên người ký (ví dụ: "Nguyễn Xuân Hiến", "Vũ Anh Tuấn", "Phạm Phương Chi")
+   - Thường ở phần dưới của trang
+   - Có thể có text "Đã ký" hoặc "Ký bởi"
+
+**Lưu ý:** Nếu trang chỉ có header/footer thông thường (không phải chữ ký), trả về false.
+
+Nếu trang có chữ ký (viết tay HOẶC điện tử), trả về:
 {
   "hasSignature": true
 }

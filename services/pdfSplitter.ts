@@ -134,13 +134,9 @@ export const splitPdfByKeywords = async (
         let sanitizedCode = docCode.trim();
         if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
         sanitizedCode = sanitizeFilePart(sanitizedCode);
-
-        const prefixedName = (sanitizedCode.startsWith('QT') || sanitizedCode.startsWith('KTKS'))
-          ? sanitizeFilePart(`${inputFileBaseName}-${sanitizedCode}`)
-          : sanitizedCode;
-        docName = prefixedName || sanitizedCode;
+        docName = `${inputFileBaseName} - ${sanitizedCode}`;
       } else {
-        docName = `Document_${documents.length + 1}`;
+        docName = `${inputFileBaseName} - Document_${documents.length + 1}`;
       }
 
       documents.push({
@@ -165,13 +161,9 @@ export const splitPdfByKeywords = async (
         let sanitizedCode = docCode.trim();
         if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
         sanitizedCode = sanitizeFilePart(sanitizedCode);
-
-        const prefixedName = (sanitizedCode.startsWith('QT') || sanitizedCode.startsWith('KTKS'))
-          ? sanitizeFilePart(`${inputFileBaseName}-${sanitizedCode}`)
-          : sanitizedCode;
-        docName = prefixedName || sanitizedCode;
+        docName = `${inputFileBaseName} - ${sanitizedCode}`;
       } else {
-        docName = `Document_${documents.length + 1}`;
+        docName = `${inputFileBaseName} - Document_${documents.length + 1}`;
       }
 
       documents.push({
@@ -193,9 +185,9 @@ export const splitPdfByKeywords = async (
         let sanitizedCode = docCode.trim();
         if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
         sanitizedCode = sanitizeFilePart(sanitizedCode);
-        docName = sanitizeFilePart(`${inputFileBaseName}-${sanitizedCode}`);
+        docName = `${inputFileBaseName} - ${sanitizedCode}`;
       } else {
-        docName = 'Document_1';
+        docName = `${inputFileBaseName} - Document_1`;
       }
 
       documents.push({
@@ -426,7 +418,7 @@ export const splitPdfByKeywords = async (
 
             const docCode = doc.code || 'Document';
             const logBaseName = sanitizeFilePart(`${inputFileBaseName}-${docCode}`);
-            const filename = logCounter === 1 ? `LOG${logBaseName}.pdf` : `LOG_${logCounter}${logBaseName}.pdf`;
+            const filename = logCounter === 1 ? `${logBaseName}_LOG.pdf` : `${logCounter}${logBaseName}_LOG.pdf`;
 
             filesToSave.push({
               path: logFolderPath,
