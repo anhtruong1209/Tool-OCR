@@ -14,10 +14,10 @@ export interface InvoiceItem {
 export interface InvoiceData {
   type: 'INVOICE';
   // Thông tin chung
-  invoiceSymbol: string | null; 
-  invoiceNo: string | null;     
-  date: string | null;          
-  
+  invoiceSymbol: string | null;
+  invoiceNo: string | null;
+  date: string | null;
+
   // Người bán
   sellerName: string | null;
   sellerTaxCode: string | null;
@@ -26,35 +26,35 @@ export interface InvoiceData {
   sellerBankAccount: string | null;
 
   // Người mua
-  buyerCustomerId: string | null;   
-  billingPeriod: string | null;     
+  buyerCustomerId: string | null;
+  billingPeriod: string | null;
   buyerName: string | null;
-  buyerCompanyName: string | null; 
+  buyerCompanyName: string | null;
   buyerTaxCode: string | null;
-  buyerBudgetCode: string | null;  
-  buyerPersonalId: string | null;  
-  buyerPassportNo: string | null;  
+  buyerBudgetCode: string | null;
+  buyerPersonalId: string | null;
+  buyerPassportNo: string | null;
   buyerAddress: string | null;
-  buyerBankAccount: string | null; 
-  paymentMethod: string | null;    
+  buyerBankAccount: string | null;
+  paymentMethod: string | null;
 
   // Chi tiết
   items: InvoiceItem[];
 
   // Tổng cộng
-  totalAmount: number | null;      
-  vatRate: string | null;          
-  vatAmount: number | null;        
-  totalPayment: number | null;     
-  amountInWords: string | null;    
-  
+  totalAmount: number | null;
+  vatRate: string | null;
+  vatAmount: number | null;
+  totalPayment: number | null;
+  amountInWords: string | null;
+
   // Chữ ký điện tử
-  signedBy: string | null;         
-  signedDate: string | null;       
+  signedBy: string | null;
+  signedDate: string | null;
 
   // Tra cứu
-  lookupWebsite: string | null;    
-  lookupCode: string | null;       
+  lookupWebsite: string | null;
+  lookupCode: string | null;
 
   // AI nhận xét
   summary: string | null;
@@ -93,13 +93,13 @@ export interface SARReportData {
   dateLocation: string | null; // Đà Nẵng, 16 giờ...
   recipient: string | null; // Kính gửi...
   intro: string | null; // Hồi 16 giờ...
-  
+
   // Sections
   content: string | null; // 1. Nội dung...
   measures: string | null; // 2. Biện pháp xử lý...
   proposal: string | null; // 3. Đề nghị...
   attachedFiles: string | null; // 4. Tài liệu kèm theo...
-  
+
   signerLeft: string | null; // TRỰC BAN
   signerRight: string | null; // KT. GIÁM ĐỐC
   signerNameRight: string | null; // Phan Thành Trường...
@@ -111,16 +111,16 @@ export interface IncidentReportData {
   reportTitle: string | null; // BÁO CÁO XỬ LÝ SỐ...
   stationName: string | null; // Đài TTDH Đà Nẵng...
   date: string | null;
-  
+
   // Vessel Info
   vesselName: string | null; // TÀU CÁ QNa 91892 TS
   nationality: string | null;
   coordinates: string | null; // Vị trí
   incidentType: string | null; // 01 người bị thương nặng...
-  
+
   // Processing Table (Xử lý độc lập)
   processingTable: ProcessingTableRow[];
-  
+
   // Frequencies mentioned
   frequencyInfo: string | null; // Tần số 7903 kHz...
 
@@ -130,7 +130,7 @@ export interface IncidentReportData {
   // Footer / Coordination
   coordinationInfo: string | null; // Đơn vị phối hợp
   proposal: string | null; // Đề xuất xử lý
-  
+
   // Attached Documents (Tài liệu kèm theo - Page 2)
   attachedDocuments?: AttachedDocument[];
 
@@ -147,6 +147,21 @@ export interface IncidentReportData {
 }
 
 // --- SPLITTER TYPES ---
+export interface BroadcastAndServiceCode {
+  broadcastCode: 'MET' | 'NAV' | 'SAR' | 'WX' | 'TUYEN' | null;
+  serviceCode: 'NTX' | 'RTP' | 'EGC' | null;
+}
+
+export interface PageCodeResult {
+  page: number;
+  code: string | null;
+}
+
+export interface BanTinNguonKeywords {
+  codePatterns: string[];
+  textPatterns: string[];
+}
+
 export interface SplitDocument {
   id: string;
   filename: string;

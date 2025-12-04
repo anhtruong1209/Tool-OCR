@@ -8,11 +8,11 @@ interface UploadAreaProps {
   multiple?: boolean;
 }
 
-export const UploadArea: React.FC<UploadAreaProps> = ({ 
-  onFileSelect, 
+export const UploadArea: React.FC<UploadAreaProps> = ({
+  onFileSelect,
   onMultipleFilesSelect,
   disabled,
-  multiple = false 
+  multiple = false
 }) => {
   const validateFile = (file: File): boolean => {
     if (file.type !== 'application/pdf') {
@@ -30,17 +30,17 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     if (disabled) return;
-    
+
     const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-    
+
     if (files.length === 0) {
-        alert('Vui lòng chỉ tải lên file PDF.');
-        return;
-      }
+      alert('Vui lòng chỉ tải lên file PDF.');
+      return;
+    }
 
     // Validate all files
     const validFiles = files.filter(validateFile);
-    
+
     if (validFiles.length === 0) return;
 
     if (multiple && onMultipleFilesSelect) {
@@ -53,23 +53,23 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled) return;
     const files = Array.from(e.target.files || []).filter(f => f.type === 'application/pdf');
-    
+
     if (files.length === 0) return;
 
     // Validate all files
     const validFiles = files.filter(validateFile);
-    
+
     if (validFiles.length === 0) {
       e.target.value = '';
-        return;
-      }
+      return;
+    }
 
     if (multiple && onMultipleFilesSelect) {
       onMultipleFilesSelect(validFiles);
     } else {
       onFileSelect(validFiles[0]);
     }
-    
+
     e.target.value = ''; // Reset input value
   }, [onFileSelect, onMultipleFilesSelect, disabled, multiple]);
 
@@ -79,8 +79,8 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
       onDrop={handleDrop}
       className={`
         relative border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-200
-        ${disabled 
-          ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60' 
+        ${disabled
+          ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
           : 'border-blue-300 bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer'
         }
       `}
@@ -93,7 +93,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
         disabled={disabled}
       />
-      
+
       <div className="flex flex-col items-center justify-center gap-4 pointer-events-none relative z-0">
         <div className={`p-4 rounded-full ${disabled ? 'bg-slate-100' : 'bg-blue-100 text-blue-600'}`}>
           {disabled ? <FileText className="w-8 h-8 text-slate-400" /> : <Upload className="w-8 h-8" />}
@@ -103,8 +103,8 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
             {multiple ? 'Tải lên nhiều file PDF' : 'Tải lên hóa đơn PDF'}
           </p>
           <p className="text-sm text-slate-500 mt-1">
-            {multiple 
-              ? 'Kéo thả hoặc click để chọn nhiều file (Max 10MB/file)' 
+            {multiple
+              ? 'Kéo thả hoặc click để chọn nhiều file (Max 10MB/file)'
               : 'Kéo thả hoặc click để chọn file (Max 10MB)'}
           </p>
         </div>
