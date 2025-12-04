@@ -851,8 +851,18 @@ NHIỆM VỤ: Phân tích TẤT CẢ các trang và trả về JSON với đầy
       - Nếu không có → null
    
    d) **Là trang LOG không (isLogPage)**:
-      - Nếu trang KHÔNG có mã code nhận diện được (QT, KTKS, TTNH, etc.) → true
-      - Nếu trang có mã code → false
+      - LOG = trang chỉ là log ảnh/log email, KHÔNG phải nội dung chính của biểu mẫu
+      - Ví dụ: screenshot hệ thống, ảnh log, trang in email (From/To/Subject, nhiều địa chỉ email)
+      - Các trang có tiêu đề, form, bảng biểu, hoặc nội dung BẢN TIN chính thì KHÔNG phải LOG (isLogPage = false)
+
+   e) **Là trang BẢN TIN NGUỒN (isBanTinNguonHeader)**:
+      - Nếu trang có header "Cộng hòa xã hội chủ nghĩa Việt Nam" (viết hoa/thường tuỳ ý) ở phía trên
+      - Và bên dưới có nội dung BẢN TIN (không phải COVER QT/KTKS)
+      - Thì đặt isBanTinNguonHeader = true, ngược lại = false
+
+   f) **Trang LOGMAIL có gmail (hasGmail)**:
+      - Kiểm tra xem trong trang có chuỗi địa chỉ email chứa "@gmail.com" hay không
+      - Nếu có ít nhất một địa chỉ "@gmail.com" → hasGmail = true, ngược lại = false
 
 **LƯU Ý QUAN TRỌNG:**
 - Số trang bắt đầu từ ${startPageNum}
@@ -869,7 +879,9 @@ Trả về JSON format:
       "code": "QT.MSI-BM.01" hoặc null,
       "hasPersonName": true hoặc false,
       "personName": "Vũ Anh Tuấn" hoặc null,
-      "isLogPage": false
+      "isLogPage": false,
+      "isBanTinNguonHeader": true hoặc false,
+      "hasGmail": true hoặc false
     },
     ...
   ]

@@ -167,7 +167,9 @@ export interface PageAnalysis {
   code: string | null;           // QT.MSI-BM.01, TTNH-04H00, etc.
   hasPersonName: boolean;         // Có tên người không (điểm cắt)
   personName?: string;            // Tên người nếu có
-  isLogPage: boolean;             // Trang LOG (không có code nhận diện được)
+  isLogPage: boolean;             // Trang LOG (log ảnh, log mail, không phải nội dung chính)
+  isBanTinNguonHeader?: boolean;  // Trang có header "Cộng hòa xã hội chủ nghĩa Việt Nam" của BẢN TIN NGUỒN
+  hasGmail?: boolean;             // Trang có chứa địa chỉ email dạng @gmail (LOGMAIL)
 }
 
 export interface PDFAnalysisResult {

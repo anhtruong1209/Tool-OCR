@@ -191,27 +191,27 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col overflow-hidden relative">
       {/* Background Pattern */}
-      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none" style={{
+      <div className="absolute inset-0 z-0 opacity-30 pointer-events-none" style={{
         backgroundImage: `radial-gradient(#cbd5e1 1px, transparent 1px)`,
-        backgroundSize: '20px 20px'
+        backgroundSize: '18px 18px'
       }}></div>
 
       {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-800 h-14 shrink-0 z-30 shadow-lg relative">
+      <header className="bg-slate-900 border-b border-slate-800 h-12 shrink-0 z-30 shadow-md relative">
         <div className="w-full px-4 h-full flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-1.5 rounded-lg text-white shadow-inner">
               <BrainCircuit size={18} strokeWidth={2.5} />
             </div>
-            <h1 className="font-bold text-lg text-white tracking-tight hidden md:block">
+            <h1 className="font-semibold text-base text-white tracking-tight hidden md:block">
               Kế Toán Vishipel AI <span className="opacity-30 font-light mx-2">|</span>
-              <span className="text-blue-300 font-medium text-sm">
+              <span className="text-blue-300 font-medium text-xs">
                 {docType === 'INVOICE' && 'Xử lý Hóa đơn GTGT'}
                 {docType === 'INCIDENT' && 'Xử lý Báo cáo Sự cố'}
                 {docType === 'SPLIT' && 'Bộ Tách PDF Tự Động'}
               </span>
             </h1>
-            <h1 className="font-bold text-lg text-white md:hidden">Vishipel AI</h1>
+            <h1 className="font-semibold text-base text-white md:hidden">Vishipel AI</h1>
           </div>
 
           {status === ProcessingStatus.SUCCESS && (
@@ -226,72 +226,72 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow flex flex-col h-[calc(100vh-3.5rem)] relative z-10">
+      <main className="flex-grow flex flex-col h-[calc(100vh-3rem)] relative z-10">
 
         {/* IDLE & PROCESSING STATES */}
         {status !== ProcessingStatus.SUCCESS && (
-          <div className="flex-grow flex flex-col items-center justify-center p-6 overflow-y-auto">
+          <div className="flex-grow flex flex-col items-center justify-start p-4 md:p-6 overflow-y-auto">
 
             {status === ProcessingStatus.IDLE && (
-              <div className="w-full max-w-6xl mx-auto space-y-8">
-                <section className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white/80 backdrop-blur-sm p-8 rounded-3xl shadow-xl border border-white/50">
-                  <div className="mx-auto max-w-3xl">
-                    <p className="text-xs uppercase tracking-[0.4em] text-slate-400 mb-3">Vishipel AI</p>
-                    <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-3 tracking-tight">
+              <div className="w-full max-w-5xl mx-auto space-y-6">
+                <section className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white/90 backdrop-blur-sm p-5 md:p-6 rounded-2xl shadow-md border border-slate-100">
+                  <div className="mx-auto max-w-2xl">
+                    <p className="text-[10px] uppercase tracking-[0.35em] text-slate-400 mb-2">Vishipel AI</p>
+                    <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
                       Bộ Tách PDF Tự Động
                     </h2>
-                    <p className="text-slate-600 mb-8 font-medium">
-                      Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo từ khóa.
+                    <p className="text-slate-600 mb-4 text-sm">
+                      Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo cấu trúc nghiệp vụ.
                     </p>
                   </div>
 
                   {/* Document Type Selector */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                     {/*
                             <button ...>...</button>
                             <button ...>...</button>
                             */}
                     <button
                       onClick={() => setDocType('SPLIT')}
-                      className={`p-5 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${docType === 'SPLIT'
-                        ? 'border-purple-600 bg-gradient-to-br from-purple-50 via-white to-purple-100 text-purple-800 shadow-md ring-2 ring-purple-200 scale-[1.02]'
-                        : 'border-slate-200 bg-white hover:border-purple-300 text-slate-600 hover:scale-[1.02]'
+                      className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all ${docType === 'SPLIT'
+                        ? 'border-purple-500 bg-gradient-to-br from-purple-50 via-white to-purple-100 text-purple-800 shadow-sm ring-1 ring-purple-200'
+                        : 'border-slate-200 bg-white hover:border-purple-300 text-slate-600'
                         }`}
                     >
                       <div className={`p-3 rounded-2xl ${docType === 'SPLIT' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
                         <Scissors className="w-7 h-7" />
                       </div>
-                      <span className="font-bold text-lg">Tách File PDF</span>
-                      <span className="text-xs text-slate-400 font-normal text-center">Cắt file tự động theo danh sách từ khóa</span>
+                      <span className="font-semibold text-base">Tách File PDF</span>
+                      <span className="text-xs text-slate-400 font-normal text-center">Cắt file tự động theo nghiệp vụ</span>
                     </button>
                   </div>
                 </section>
 
-                <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start">
-                  <div className="rounded-3xl bg-white shadow-2xl border border-slate-100 p-6 flex flex-col gap-6">
+                <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] items-start">
+                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4">
                     <div className="flex flex-col gap-2 text-left">
-                      <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Bước 1: Chọn thư mục</p>
-                      <h3 className="text-2xl font-semibold text-slate-900">Chọn thư mục lưu kết quả</h3>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 1: Chọn thư mục</p>
+                      <h3 className="text-xl font-semibold text-slate-900">Chọn thư mục lưu kết quả</h3>
                       <p className="text-sm text-slate-500">Chọn thư mục đích trước khi tải file PDF lên.</p>
                     </div>
                     <button
                       onClick={handleSelectDestinationFolder}
-                      className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+                      className="w-full px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-3 text-sm"
                     >
                       <FolderOpen size={20} />
                       {directoryInfo ? `Đã chọn: ${directoryInfo.name}` : 'Chọn thư mục lưu file'}
                     </button>
                     {directoryInfo && (
-                      <div className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                      <div className="text-xs md:text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                         ✓ Thư mục "{directoryInfo.name}" đã được chọn. Bạn có thể upload file PDF bên dưới.
                       </div>
                     )}
                   </div>
 
-                  <div className="rounded-3xl bg-white shadow-2xl border border-slate-100 p-6 flex flex-col gap-6">
+                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4">
                     <div className="flex flex-col gap-2 text-left">
-                      <p className="text-xs uppercase tracking-[0.4em] text-slate-400">Bước 2: Upload</p>
-                      <h3 className="text-2xl font-semibold text-slate-900">Tải lên file PDF</h3>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 2: Upload</p>
+                      <h3 className="text-xl font-semibold text-slate-900">Tải lên file PDF</h3>
                       <p className="text-sm text-slate-500">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
                     </div>
                     <div className="bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200">
@@ -302,7 +302,7 @@ const App: React.FC = () => {
                         disabled={docType === 'SPLIT' && !directoryInfo}
                       />
                     </div>
-                    <div className="text-xs text-slate-400 flex items-center gap-2">
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
                       <span className="inline-flex w-2 h-2 rounded-full bg-slate-300"></span>
                       {directoryInfo
                         ? 'Sẵn sàng nhận file PDF – chọn file để bắt đầu tách.'
@@ -311,40 +311,40 @@ const App: React.FC = () => {
                   </div>
 
                   {docType === 'SPLIT' && (
-                    <div className="space-y-5">
-                      <div className="p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 text-white shadow-2xl border border-white/10 text-left min-h-[240px] flex flex-col">
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 text-white shadow-md border border-white/10 text-left min-h-[180px] flex flex-col">
                         <div className="flex items-center gap-3 mb-4">
                           <div className="bg-white/15 p-2 rounded-xl">
                             <FolderOpen size={20} />
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-white/60">Hướng dẫn</p>
-                            <h3 className="text-lg font-semibold">Thư mục lưu kết quả</h3>
+                            <p className="text-[11px] uppercase tracking-[0.3em] text-white/60">Hướng dẫn</p>
+                            <h3 className="text-base font-semibold">Thư mục lưu kết quả</h3>
                           </div>
                         </div>
-                        <p className="text-sm text-white/80 mb-4 flex-1">
+                        <p className="text-sm text-white/80 mb-3 flex-1">
                           {directoryInfo
                             ? `Hệ thống đã ghi nhớ thư mục "${directoryInfo.name}". Mở File Explorer và truy cập thư mục này để theo dõi file vừa tách.`
                             : 'Ngay khi chọn thư mục lưu, ứng dụng sẽ ghi nhớ và hiển thị hướng dẫn cụ thể tại đây.'}
                         </p>
-                        <ul className="text-sm text-white/80 space-y-2 list-disc pl-5">
+                        <ul className="text-xs md:text-sm text-white/80 space-y-1.5 list-disc pl-5">
                           <li>Tìm thư mục vừa chọn trong phần Quick Access.</li>
                           <li>File được gom vào thư mục con trùng tên từ khóa.</li>
                           <li>Giữ tab mở để hệ thống tiếp tục ghi file.</li>
                         </ul>
                       </div>
-                      <div className="p-5 rounded-3xl bg-white shadow-2xl border border-slate-100">
+                      <div className="p-4 rounded-2xl bg-white shadow-md border border-slate-100">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <div className="bg-slate-100 p-2 rounded-xl">
                               <ShieldCheck size={20} className="text-slate-500" />
                             </div>
                             <div>
-                              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Quyền truy cập</p>
-                              <h3 className="text-lg font-semibold text-slate-900">Chỉnh sửa thư mục</h3>
+                              <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Quyền truy cập</p>
+                              <h3 className="text-base font-semibold text-slate-900">Chỉnh sửa thư mục</h3>
                             </div>
                           </div>
-                          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${permissionBadgeClass}`}>
+                          <span className={`text-[11px] font-semibold px-3 py-1 rounded-full ${permissionBadgeClass}`}>
                             {permissionBadgeLabel}
                           </span>
                         </div>
@@ -354,7 +354,7 @@ const App: React.FC = () => {
                         <button
                           onClick={handleRequestEditPermission}
                           disabled={!dirHandleRef.current}
-                          className={`w-full px-4 py-2 rounded-xl font-semibold transition-colors ${dirHandleRef.current
+                          className={`w-full px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${dirHandleRef.current
                             ? 'bg-slate-900 text-white hover:bg-slate-800'
                             : 'bg-slate-200 text-slate-500 cursor-not-allowed'
                             }`}
@@ -376,7 +376,7 @@ const App: React.FC = () => {
                   )}
 
                   {docType === 'SPLIT' && (
-                    <div className="lg:col-span-2 bg-white/80 border border-slate-100 rounded-3xl shadow-xl p-4">
+                    <div className="lg:col-span-2 bg-white/80 border border-slate-100 rounded-2xl shadow-md p-3 md:p-4">
                       <JobQueueViewer onReset={handleReset} />
                     </div>
                   )}
@@ -425,9 +425,9 @@ const App: React.FC = () => {
             {/* Left Pane: PDF Preview (Simplified for Splitter, Full for others) */}
             <div className="lg:w-1/2 h-[40vh] lg:h-full bg-slate-800 overflow-auto p-4 md:p-8 shadow-inner border-r border-slate-700 relative scrollbar-thin">
               {previewUrls.length > 0 ? (
-                <div className="flex flex-col gap-6 items-center">
+                <div className="flex flex-col gap-4 items-center">
                   {previewUrls.map((url, idx) => (
-                    <div key={idx} className="relative shadow-2xl ring-1 ring-white/10 group w-full max-w-[600px]">
+                    <div key={idx} className="relative shadow-xl ring-1 ring-white/10 group w-full max-w-[520px]">
                       <img src={url} alt={`Page ${idx + 1}`} className="w-full h-auto" />
                       <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-white/20 flex items-center gap-1">
                         <Layers size={12} />

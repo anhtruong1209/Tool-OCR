@@ -1,4 +1,11 @@
 import * as pdfjsLib from 'pdfjs-dist';
+// Import worker file as bundled asset (offline-safe, không phụ thuộc CDN)
+// Vite sẽ trả về URL tĩnh tới worker và pdf.js sẽ tự tạo Web Worker từ URL này.
+// Tham khảo: https://github.com/mozilla/pdf.js/tree/master/examples/webpack
+// và cách import với Vite: ?url
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - kiểu import asset
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PDFDocument } from 'pdf-lib';
 import { SplitDocument, SplitResultData } from '../types';
 import { convertPdfToImage } from './pdfUtils';
@@ -7,7 +14,9 @@ import {
   analyzePDFComplete
 } from './geminiService';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Sử dụng worker được bundle cùng ứng dụng thay vì tải từ CDN.
+// Điều này giúp tool hoạt động khi không có internet.
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc as string;
 
 const sanitizeFilePart = (value: string, maxLength: number = 80): string => {
   if (!value) return '';
@@ -103,6 +112,16 @@ export const splitPdfByKeywords = async (
     const logPages = analysis.pages
       .filter(p => p.isLogPage)
       .map(p => p.page);
+    const banTinNguonHeaderPages = new Set(
+      analysis.pages
+        .filter(p => p.isBanTinNguonHeader)
+        .map(p => p.page)
+    );
+    const gmailLogPages = new Set(
+      analysis.pages
+        .filter(p => p.isLogPage && p.hasGmail)
+        .map(p => p.page)
+    );
 
     console.log(`[PDF Splitter] Analysis complete:`);
     console.log(`  - Broadcast: ${detectedBroadcastCode}, Service: ${detectedServiceCode}`);
@@ -337,6 +356,17 @@ export const splitPdfByKeywords = async (
         }
       }
 
+      // Bổ sung: nếu trong khoảng trang của doc có header "Cộng hòa xã hội chủ nghĩa Việt Nam"
+      // và không phải QT/KTKS thì cũng coi là BẢN TIN NGUỒN
+      if (!hasTTNH) {
+        for (let p = doc.startPage; p <= doc.endPage; p++) {
+          if (banTinNguonHeaderPages.has(p)) {
+            hasTTNH = true;
+            break;
+          }
+        }
+      }
+
       documentIsTTNH.set(doc.id, hasTTNH);
       console.log(`[PDF Splitter] Doc "${doc.filename}" → Is pure BAN TIN NGUON: ${hasTTNH}`);
     }
@@ -350,7 +380,24 @@ export const splitPdfByKeywords = async (
       const pagesToInclude: number[] = [];
       const logPagesInDoc: number[] = [];
 
-      if (shouldCheckLog && doc.pageCount > 1) {
+      // Nếu toàn bộ các trang của tài liệu này đều là LOG (theo AI),
+      // coi đây là tài liệu LOG thuần, không lưu như document chính.
+      if (shouldCheckLog) {
+        let allPagesAreLog = true;
+        for (let j = doc.startPage; j <= doc.endPage; j++) {
+          if (!logPages.includes(j)) {
+            allPagesAreLog = false;
+            break;
+          }
+        }
+        if (allPagesAreLog) {
+          for (let j = doc.startPage; j <= doc.endPage; j++) {
+            logPagesInDoc.push(j);
+          }
+        }
+      }
+
+      if (shouldCheckLog && doc.pageCount > 1 && logPagesInDoc.length === 0) {
         const pagesToCheck = doc.pageCount <= 3 ? [doc.endPage] : [doc.endPage - 1, doc.endPage];
 
         for (let j = doc.startPage; j <= doc.endPage; j++) {
@@ -424,9 +471,13 @@ export const splitPdfByKeywords = async (
 
         const isTTNH = documentIsTTNH.get(doc.id) || false;
         let folderPath: string | null = null;
+        let outputFileName = doc.filename;
+
         if (isTTNH) {
           const broadcastCode = detectedBroadcastCode || 'MET';
           folderPath = `BAN TIN NGUON/${broadcastCode}`;
+          // Riêng BẢN TIN NGUỒN: đặt tên file theo tên file gốc, không thêm mã code phía sau
+          outputFileName = `${inputFileBaseName}.pdf`;
         } else {
           folderPath = doc.code ? getFolderPath(doc.code) : null;
         }
@@ -434,7 +485,7 @@ export const splitPdfByKeywords = async (
         if (folderPath) {
           filesToSave.push({
             path: folderPath,
-            filename: doc.filename,
+            filename: outputFileName,
             bytes: pdfBytes
           });
         }
@@ -458,7 +509,11 @@ export const splitPdfByKeywords = async (
 
             const docCode = doc.code || 'Document';
             const logBaseName = sanitizeFilePart(`${inputFileBaseName}-${docCode}`);
-            const filename = logCounter === 1 ? `${logBaseName}_LOG.pdf` : `${logCounter}${logBaseName}_LOG.pdf`;
+            const isGmailLog = gmailLogPages.has(pageNum);
+            const suffix = isGmailLog ? '_LOGMAIL' : '_LOG';
+            const filename = logCounter === 1
+              ? `${logBaseName}${suffix}.pdf`
+              : `${logCounter}${logBaseName}${suffix}.pdf`;
 
             filesToSave.push({
               path: logFolderPath,
