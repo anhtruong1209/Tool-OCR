@@ -22,12 +22,12 @@ export interface JobQueueConfig {
 }
 
 const DEFAULT_CONFIG: JobQueueConfig = {
-  // Xử lý tuần tự: 1 file tại một thời điểm (mỗi file 2 request Gemini)
-  maxConcurrent: 1,
-  // Paid tier: gemini-2.5-flash có ~1000 RPM. Giãn cách 200ms ~ 300 RPM để an toàn.
-  rateLimitDelay: 200, // 0.2 giây giữa các request
+  maxConcurrent: 1, // Xử lý tuần tự (1 file tại một thời điểm)
+  // Gemini 2.5 Flash Free Tier: 10 RPM = 1 request per 6 seconds minimum
+  // Set to 7000ms (7 seconds) to be safe and account for processing time
+  rateLimitDelay: 7000, // 7 giây delay giữa các request (để không vượt 10 RPM)
   retryAttempts: 3,
-  retryDelay: 2000, // 2 giây delay trước khi retry (backoff thêm bên dưới nếu 429)
+  retryDelay: 2000, // 2 giây delay trước khi retry
 };
 
 class JobQueue {
@@ -170,7 +170,7 @@ class JobQueue {
 
         // Process next job
         this.processNext();
-      } catch (processError: any) {
+      } catch (processError) {
         clearInterval(progressInterval);
         throw processError;
       }
@@ -185,11 +185,7 @@ class JobQueue {
         job.error = `Đang thử lại... (${attempt}/${this.config.retryAttempts})`;
         this.notify();
 
-        // Nếu là lỗi 429/503 thì backoff dài hơn
-        const isRateLimit = error?.message?.includes('429') || error?.message?.includes('rate') || error?.message?.includes('quota');
-        const isUnavailable = error?.message?.includes('503');
-        const delay = isRateLimit || isUnavailable ? this.config.retryDelay * attempt * 2 : this.config.retryDelay;
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
         return this.processJobWithRetry(job, attempt + 1);
       }
 

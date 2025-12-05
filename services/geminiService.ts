@@ -11,8 +11,6 @@ import {
   PageAnalysis
 } from '../types';
 
-const MODEL_FALLBACKS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-
 // --- BAN TIN NGUON KEYWORDS CONFIG ---
 export const BAN_TIN_NGUON_KEYWORDS: BanTinNguonKeywords = {
   codePatterns: ['TTNH', 'ĐBQG', 'DBQG', '04H00'],
@@ -239,7 +237,7 @@ export const analyzeDocument = async (base64Images: string[], type: DocumentType
 
   try {
     const response = await ai.models.generateContent({
-      model: MODEL_FALLBACKS[0],
+      model: model,
       contents: {
         parts: contentParts,
       },
@@ -291,6 +289,7 @@ export const detectBroadcastAndServiceCode = async (
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const model = 'gemini-2.5-flash';
 
   let detectedBroadcastCode: 'MET' | 'NAV' | 'SAR' | 'WX' | 'TUYEN' | null = null;
   let detectedServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
@@ -339,7 +338,7 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
       contentParts.push({ text: prompt } as any);
 
       const response = await ai.models.generateContent({
-        model: MODEL_FALLBACKS[0],
+        model: model,
         contents: {
           parts: contentParts,
         },
@@ -949,55 +948,21 @@ OUTPUT JSON (chỉ JSON, không giải thích):
     }));
     contentParts.push({ text: prompt });
 
-    let success = false;
-    let batchResult: PDFAnalysisResult | null = null;
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: {
+          parts: contentParts,
+        },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0,
+        },
+      });
 
-    for (let m = 0; m < MODEL_FALLBACKS.length && !success; m++) {
-      const model = MODEL_FALLBACKS[m];
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: {
-            parts: contentParts,
-          },
-          config: {
-            responseMimeType: "application/json",
-            temperature: 0,
-          },
-        });
-
-        const jsonText = response.text?.trim();
-        if (!jsonText) {
-          throw new Error('empty_response');
-        }
-
-        try {
-          const parsed = JSON.parse(jsonText);
-          const adjustedPages = parsed.pages.map((p: any) => ({
-            ...p,
-            page: (p.page || 1) + start
-          }));
-          batchResult = {
-            broadcastCode: parsed.broadcastCode,
-            serviceCode: parsed.serviceCode,
-            pages: adjustedPages
-          };
-          success = true;
-        } catch (parseError) {
-          console.error(`[Gemini Service] JSON parse error for batch ${i + 1} on model ${model}:`, jsonText);
-          throw parseError;
-        }
-      } catch (err: any) {
-        const isRateLimit = err?.message?.includes('429') || err?.message?.includes('quota');
-        const isEmpty = err?.message === 'empty_response';
-        console.warn(`[Gemini Service] Model ${model} failed for batch ${i + 1}:`, err?.message || err);
-        // Try next model if available
-        if (m < MODEL_FALLBACKS.length - 1) {
-          // small delay before next model
-          await new Promise(res => setTimeout(res, isRateLimit ? 1500 : 300));
-          continue;
-        }
-        // Out of fallbacks
+      const jsonText = response.text?.trim();
+      if (!jsonText) {
+        console.error(`[Gemini Service] No response for batch ${i + 1}`);
         allBatchResults.push({
           broadcastCode: null,
           serviceCode: null,
@@ -1008,11 +973,45 @@ OUTPUT JSON (chỉ JSON, không giải thích):
             isLogPage: false
           }))
         });
+      } else {
+        let batchResult: PDFAnalysisResult;
+        try {
+          batchResult = JSON.parse(jsonText);
+          const adjustedPages = batchResult.pages.map(p => ({
+            ...p,
+            page: (p.page || 1) + start
+          }));
+          allBatchResults.push({
+            broadcastCode: batchResult.broadcastCode,
+            serviceCode: batchResult.serviceCode,
+            pages: adjustedPages
+          });
+        } catch (parseError) {
+          console.error(`[Gemini Service] JSON parse error for batch ${i + 1}:`, jsonText);
+          allBatchResults.push({
+            broadcastCode: null,
+            serviceCode: null,
+            pages: images.map((_, idx) => ({
+              page: startPageNum + idx,
+              code: null,
+              hasPersonName: false,
+              isLogPage: false
+            }))
+          });
+        }
       }
-    }
-
-    if (success && batchResult) {
-      allBatchResults.push(batchResult);
+    } catch (error) {
+      console.error(`[Gemini Service] Error analyzing batch ${i + 1}:`, error);
+      allBatchResults.push({
+        broadcastCode: null,
+        serviceCode: null,
+        pages: images.map((_, idx) => ({
+          page: startPageNum + idx,
+          code: null,
+          hasPersonName: false,
+          isLogPage: false
+        }))
+      });
     }
   }
 

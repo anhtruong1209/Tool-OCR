@@ -390,7 +390,7 @@ export const splitPdfByKeywords = async (
 
         if (codeUpper.includes('.02') || codeUpper.includes('02')) {
           if (hasQT) {
-            basePath = 'BAN TIN NGUON DA DUOC XU LY';
+            basePath = 'BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY';
           } else if (hasKTKS) {
             basePath = 'BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY';
           } else {
