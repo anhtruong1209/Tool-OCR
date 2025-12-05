@@ -204,7 +204,7 @@ const App: React.FC = () => {
               <BrainCircuit size={18} strokeWidth={2.5} />
             </div>
             <h1 className="font-semibold text-base text-white tracking-tight hidden md:block">
-              Kế Toán Vishipel AI <span className="opacity-30 font-light mx-2">|</span>
+              Vishipel AI <span className="opacity-30 font-light mx-2">|</span>
               <span className="text-blue-300 font-medium text-xs">
                 {docType === 'INVOICE' && 'Xử lý Hóa đơn GTGT'}
                 {docType === 'INCIDENT' && 'Xử lý Báo cáo Sự cố'}

@@ -77,7 +77,7 @@ export const requestDirectoryPicker = async (): Promise<FileSystemDirectoryHandl
 /**
  * Helper function to get or create directory
  */
-const getOrCreateDirectory = async (dirHandle: FileSystemDirectoryHandle, pathParts: string[]): Promise<FileSystemDirectoryHandle> => {
+export const getOrCreateDirectory = async (dirHandle: FileSystemDirectoryHandle, pathParts: string[]): Promise<FileSystemDirectoryHandle> => {
   if (pathParts.length === 0) return dirHandle;
   
   const [first, ...rest] = pathParts;

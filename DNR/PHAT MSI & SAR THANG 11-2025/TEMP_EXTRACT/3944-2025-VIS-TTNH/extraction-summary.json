@@ -2,10 +2,10 @@
   "originalFileName": "3944-2025-VIS-TTNH.pdf",
   "broadcastCode": null,
   "serviceCode": "RTP",
-  "generatedAt": "2025-12-05T02:09:01.840Z",
+  "generatedAt": "2025-12-05T02:59:31.307Z",
   "documents": [
     {
-      "id": "3ixs0afb4",
+      "id": "rzb88525f",
       "filename": "3944-2025-VIS-TTNH - QT.MSI-BM.01.pdf",
       "code": "QT.MSI-BM.01",
       "startPage": 1,
@@ -14,25 +14,16 @@
       "recommendedPath": "COVER/COVER/MET"
     },
     {
-      "id": "c113v73nz",
-      "filename": "3944-2025-VIS-TTNH - KTKS.MSI.TC-BM.01.pdf",
+      "id": "wia9867xq",
+      "filename": "3944-2025-VIS-TTNH.pdf",
       "code": "KTKS.MSI.TC-BM.01",
       "startPage": 2,
-      "endPage": 2,
-      "pageCount": 1,
-      "recommendedPath": "COVER/KTKSTC BM 01/MET"
-    },
-    {
-      "id": "hdceiywdt",
-      "filename": "3944-2025-VIS-TTNH.pdf",
-      "code": null,
-      "startPage": 3,
       "endPage": 3,
-      "pageCount": 1,
+      "pageCount": 2,
       "recommendedPath": "BAN TIN NGUON/MET"
     },
     {
-      "id": "cefpglcq2",
+      "id": "83zh80jwf",
       "filename": "3944-2025-VIS-TTNH - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "startPage": 5,
@@ -41,7 +32,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "k7afu1x57",
+      "id": "t2tiz9fvr",
       "filename": "3944-2025-VIS-TTNH - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "startPage": 7,
@@ -50,7 +41,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "mmhvv6uiz",
+      "id": "8clejox74",
       "filename": "3944-2025-VIS-TTNH - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "startPage": 8,
@@ -59,7 +50,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "cxyw0dfzj",
+      "id": "c6y9yf81d",
       "filename": "3944-2025-VIS-TTNH - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "startPage": 10,
@@ -68,7 +59,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "v31t69kx6",
+      "id": "ekrxvzcp6",
       "filename": "3944-2025-VIS-TTNH - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "startPage": 11,
@@ -77,7 +68,7 @@
       "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/MET"
     },
     {
-      "id": "mxnap58m7",
+      "id": "ms4er7eyi",
       "filename": "3944-2025-VIS-TTNH - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "startPage": 12,
@@ -86,7 +77,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "djvhkatae",
+      "id": "2bydg8yeh",
       "filename": "3944-2025-VIS-TTNH - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "startPage": 14,
@@ -105,7 +96,7 @@
   ],
   "analysis": {
     "broadcastCode": null,
-    "serviceCode": "NTX",
+    "serviceCode": null,
     "pages": [
       {
         "page": 1,
@@ -125,11 +116,11 @@
         "isNewFormStart": true,
         "hasPersonName": true,
         "personName": "Nguyễn Thị Uyên Thảo",
-        "personRole": "Người KTKS",
+        "personRole": "Người KTKS 01",
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,
-        "serviceHint": "RTP"
+        "serviceHint": null
       },
       {
         "page": 3,
@@ -137,7 +128,7 @@
         "isNewFormStart": false,
         "hasPersonName": true,
         "personName": "Vũ Anh Tuấn",
-        "personRole": "P. Trưởng phòng Dự báo Thời tiết",
+        "personRole": "P. TRƯỞNG PHÒNG DỰ BÁO THỜI TIẾT",
         "isLogPage": false,
         "isBanTinNguonHeader": true,
         "hasEmail": false,
@@ -184,8 +175,8 @@
         "formCode": "KTKS.MSI.TC-BM.02",
         "isNewFormStart": true,
         "hasPersonName": true,
-        "personName": "Lê Thị Thúy Tiên",
-        "personRole": "Người KTKS",
+        "personName": "Lê Thị Thùy Tiên",
+        "personRole": "Người KTKS 01",
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,
@@ -213,15 +204,15 @@
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,
-        "serviceHint": "RTP"
+        "serviceHint": null
       },
       {
         "page": 10,
         "formCode": "KTKS.MSI.TC-BM.03",
         "isNewFormStart": true,
         "hasPersonName": true,
-        "personName": "Lê Thị Thúy Tiên",
-        "personRole": "Người KTKS",
+        "personName": "Lê Thị Thùy Tiên",
+        "personRole": "Người KTKS 01",
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,
@@ -261,15 +252,15 @@
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,
-        "serviceHint": "NTX"
+        "serviceHint": null
       },
       {
         "page": 14,
         "formCode": "KTKS.MSI.TC-BM.02",
         "isNewFormStart": true,
         "hasPersonName": true,
-        "personName": "Lê Thị Thúy Tiên",
-        "personRole": "Người KTKS",
+        "personName": "Lê Thị Thùy Tiên",
+        "personRole": "Người KTKS 01",
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,
@@ -304,8 +295,8 @@
         "formCode": "KTKS.MSI.TC-BM.03",
         "isNewFormStart": true,
         "hasPersonName": true,
-        "personName": "Nguyễn Đăng Bảo",
-        "personRole": "Người KTKS",
+        "personName": "Lê Thị Thuỳ Tiên",
+        "personRole": "Người KTKS 01",
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false,

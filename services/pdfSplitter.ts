@@ -218,8 +218,9 @@ export const splitPdfByKeywords = async (
             const prevPageInfo = analysis.pages.find(p => p.page === lastSignaturePage);
             if (prevPageInfo && prevPageInfo.hasPersonName) {
               // Lưu document
+              // QUAN TRỌNG: BAN TIN NGUON không bao giờ có code, chỉ dùng tên file gốc
               const docCode = currentDocType === 'BAN_TIN_NGUON' 
-                ? findCodeInRange(currentDocStartPage, lastSignaturePage) || 'BAN_TIN_NGUON'
+                ? 'BAN_TIN_NGUON' // Không tìm code trong range cho BAN TIN NGUON
                 : currentDocFormCode || findCodeInRange(currentDocStartPage, lastSignaturePage);
               
               if (docCode) {
@@ -252,11 +253,16 @@ export const splitPdfByKeywords = async (
       
       // QUAN TRỌNG: BAN TIN NGUON không bao giờ có formCode
       // Bắt đầu BAN TIN NGUON: có header "CỘNG HÒA..." VÀ không có formCode VÀ chưa có document nào đang xây dựng
+      // VÀ trang trước đó không có formCode (để tránh nhầm với biểu mẫu)
       if (pageInfo.isBanTinNguonHeader && !pageInfo.formCode && currentDocStartPage === null) {
-        // Bắt đầu BAN TIN NGUON mới
-        currentDocStartPage = pageNum;
-        currentDocType = 'BAN_TIN_NGUON';
-        currentDocFormCode = null;
+        // Kiểm tra trang trước đó: nếu có formCode thì không phải BAN TIN NGUON
+        const prevPageInfo = analysis.pages.find(p => p.page === pageNum - 1);
+        if (!prevPageInfo || !prevPageInfo.formCode) {
+          // Bắt đầu BAN TIN NGUON mới
+          currentDocStartPage = pageNum;
+          currentDocType = 'BAN_TIN_NGUON';
+          currentDocFormCode = null;
+        }
       }
       // Bắt đầu Biểu mẫu: có formCode (mã số ở khung góc)
       // QUAN TRỌNG: Nếu có formCode thì KHÔNG PHẢI là BAN TIN NGUON
@@ -269,8 +275,9 @@ export const splitPdfByKeywords = async (
             const prevPageInfo = analysis.pages.find(p => p.page === lastSignaturePage);
             if (prevPageInfo && !prevPageInfo.isLogPage && prevPageInfo.hasPersonName) {
               // Lưu document
+              // QUAN TRỌNG: BAN TIN NGUON không bao giờ có code, chỉ dùng tên file gốc
               const docCode = currentDocType === 'BAN_TIN_NGUON' 
-                ? findCodeInRange(currentDocStartPage, lastSignaturePage) || 'BAN_TIN_NGUON'
+                ? 'BAN_TIN_NGUON' // Không tìm code trong range cho BAN TIN NGUON
                 : currentDocFormCode || findCodeInRange(currentDocStartPage, lastSignaturePage);
               
               if (docCode) {
@@ -308,19 +315,21 @@ export const splitPdfByKeywords = async (
         const nextPageNum = pageNum + 1;
         const nextPageInfo = analysis.pages.find(p => p.page === nextPageNum);
         
-        // Chỉ kết thúc document nếu:
+        // QUAN TRỌNG: Chỉ kết thúc document nếu:
         // 1. Trang tiếp theo có formCode mới (khác với formCode hiện tại) VÀ không phải LOG
+        //    VÀ trang tiếp theo có isNewFormStart = true (đảm bảo đây là biểu mẫu mới, không phải trang tiếp theo)
         // 2. Hoặc đây là trang cuối cùng
         // 3. Hoặc trang tiếp theo có isBanTinNguonHeader (bắt đầu BAN TIN NGUON mới) VÀ document hiện tại không phải BAN TIN NGUON
+        // KHÔNG kết thúc nếu trang tiếp theo không có formCode (có thể là trang tiếp theo của document hiện tại)
         const shouldEndDocument = 
-          (nextPageInfo && nextPageInfo.formCode && nextPageInfo.formCode !== currentDocFormCode && !nextPageInfo.isLogPage) ||
+          (nextPageInfo && nextPageInfo.formCode && nextPageInfo.formCode !== currentDocFormCode && !nextPageInfo.isLogPage && nextPageInfo.isNewFormStart) ||
           (pageNum === numPages) ||
           (nextPageInfo && nextPageInfo.isBanTinNguonHeader && !nextPageInfo.formCode && currentDocType !== 'BAN_TIN_NGUON');
         
         if (shouldEndDocument) {
           // Lưu document hiện tại
           const docCode = currentDocType === 'BAN_TIN_NGUON'
-            ? findCodeInRange(currentDocStartPage, pageNum) || 'BAN_TIN_NGUON'
+            ? 'BAN_TIN_NGUON' // BAN TIN NGUON không có code, chỉ dùng tên file gốc
             : currentDocFormCode || findCodeInRange(currentDocStartPage, pageNum);
           
           if (docCode) {
@@ -349,6 +358,11 @@ export const splitPdfByKeywords = async (
         // Nếu không, tiếp tục document hiện tại (không làm gì, chỉ tiếp tục vòng lặp)
         // Điều này cho phép document có nhiều trang
       }
+      // Nếu trang không có hasPersonName và không có formCode, nhưng đang trong document → tiếp tục document
+      else if (!pageInfo.formCode && !pageInfo.isBanTinNguonHeader && currentDocStartPage !== null && currentDocType !== null) {
+        // Tiếp tục document hiện tại (không làm gì, chỉ tiếp tục vòng lặp)
+        // Điều này cho phép document có nhiều trang
+      }
     }
 
     // Handle remaining pages (nếu còn document chưa kết thúc)
@@ -358,8 +372,9 @@ export const splitPdfByKeywords = async (
       while (lastSignaturePage >= currentDocStartPage) {
         const pageInfo = analysis.pages.find(p => p.page === lastSignaturePage);
         if (pageInfo && !pageInfo.isLogPage && pageInfo.hasPersonName) {
+          // QUAN TRỌNG: BAN TIN NGUON không bao giờ có code, chỉ dùng tên file gốc
           const docCode = currentDocType === 'BAN_TIN_NGUON'
-            ? findCodeInRange(currentDocStartPage, lastSignaturePage) || 'BAN_TIN_NGUON'
+            ? 'BAN_TIN_NGUON' // Không tìm code trong range cho BAN TIN NGUON
             : currentDocFormCode || findCodeInRange(currentDocStartPage, lastSignaturePage);
           
           if (docCode) {

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { jobQueue, Job } from '../services/jobQueue';
-import { CheckCircle, XCircle, Loader2, Download, Trash2, FileText, Sparkles, Zap, Clock, RefreshCw } from 'lucide-react';
+import { syncFilesToDestination } from '../services/fileSync';
+import { requestDirectoryPicker } from '../services/fileSaver';
+import { CheckCircle, XCircle, Loader2, Download, Trash2, FileText, Sparkles, Zap, Clock, RefreshCw, FolderSync } from 'lucide-react';
 
 const TIPS = [
   "💡 Hệ thống đang quét mã số trên từng trang PDF...",
@@ -19,6 +21,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
   const [currentTip, setCurrentTip] = useState(0);
   const [processingJob, setProcessingJob] = useState<Job | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [syncingJobs, setSyncingJobs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Subscribe to job updates
@@ -79,6 +82,46 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
 
   const handleRemove = (jobId: string) => {
     jobQueue.removeJob(jobId);
+  };
+
+  const handleSyncToFolder = async (job: Job) => {
+    if (syncingJobs.has(job.id)) return; // Đang sync, bỏ qua
+    
+    try {
+      setSyncingJobs(prev => new Set(prev).add(job.id));
+      
+      // Yêu cầu chọn folder đích
+      const destinationHandle = await requestDirectoryPicker();
+      if (!destinationHandle) {
+        throw new Error('Vui lòng chọn folder đích để đồng bộ file.');
+      }
+
+      // Đồng bộ file từ TEMP_EXTRACT vào folder đích
+      const result = await syncFilesToDestination(
+        job.rootDirHandle,
+        job.file.name,
+        destinationHandle
+      );
+
+      if (result.failed > 0) {
+        alert(`Đồng bộ hoàn tất với một số lỗi:\n- Thành công: ${result.success} file\n- Thất bại: ${result.failed} file\n\nLỗi:\n${result.errors.join('\n')}`);
+      } else {
+        alert(`Đồng bộ thành công ${result.success} file vào folder "${destinationHandle.name}"!`);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // User cancelled folder picker
+        return;
+      }
+      console.error('[JobQueueViewer] Error syncing files:', error);
+      alert(`Lỗi khi đồng bộ file: ${error.message}`);
+    } finally {
+      setSyncingJobs(prev => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+    }
   };
 
   const handleClearCompleted = () => {
@@ -244,15 +287,41 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {job.status === 'completed' && job.result?.zipBlob && (
-                    <button
-                      onClick={() => handleDownload(job)}
-                      className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm"
-                      title="Tải xuống"
-                    >
-                      <Download className="w-4 h-4" />
-                      Tải ZIP
-                    </button>
+                  {job.status === 'completed' && (
+                    <>
+                      {job.result?.zipBlob && (
+                        <button
+                          onClick={() => handleDownload(job)}
+                          className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm"
+                          title="Tải xuống"
+                        >
+                          <Download className="w-4 h-4" />
+                          Tải ZIP
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleSyncToFolder(job)}
+                        disabled={syncingJobs.has(job.id)}
+                        className={`px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm ${
+                          syncingJobs.has(job.id)
+                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600'
+                        }`}
+                        title="Đồng bộ vào folder"
+                      >
+                        {syncingJobs.has(job.id) ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Đang đồng bộ...
+                          </>
+                        ) : (
+                          <>
+                            <FolderSync className="w-4 h-4" />
+                            Đồng bộ vào folder
+                          </>
+                        )}
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => handleRemove(job.id)}
