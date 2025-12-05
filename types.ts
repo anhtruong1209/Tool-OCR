@@ -162,18 +162,34 @@ export interface BanTinNguonKeywords {
   textPatterns: string[];
 }
 
+export type PageType = 'FORM_HEADER' | 'LOG_SCREEN' | 'SOURCE_HEADER' | 'CONTENT';
+
 export interface PageAnalysis {
+  // 1-based page index
   page: number;
-  code: string | null;           // QT.MSI-BM.01, TTNH-04H00, etc. (deprecated, dùng formCode)
-  formCode?: string | null;      // Mã số biểu mẫu ở khung góc (QT.MSI-BM.01, KTKS.MSI.TC-BM.01, etc.)
-  isNewFormStart?: boolean;      // Trang này là TRANG ĐẦU của biểu mẫu mới (có khung Mã số, tiêu đề lớn)
-  hasPersonName: boolean;         // Có tên người không (điểm cắt)
-  personName?: string;            // Tên người nếu có
-  personRole?: string | null;     // Chức danh người ký (để debug)
-  isLogPage: boolean;             // Trang LOG (log ảnh, log mail, không phải nội dung chính)
-  isBanTinNguonHeader?: boolean;  // Trang có header "Cộng hòa xã hội chủ nghĩa Việt Nam" của BẢN TIN NGUỒN
-  hasEmail?: boolean;             // Trang có chứa địa chỉ email (LOGMAIL: From/To/Subject...)
-  serviceHint?: 'NTX' | 'RTP' | 'EGC' | null; // Nếu trang cho thấy mã dịch vụ cụ thể
+  pageIndex?: number; // alias for compatibility
+
+  // Classification
+  type?: PageType; // FORM_HEADER | LOG_SCREEN | SOURCE_HEADER | CONTENT
+
+  // Codes & metadata
+  code: string | null;            // deprecated, use formCode
+  formCode?: string | null;       // Mã số biểu mẫu ở khung góc
+  serviceHint?: 'NTX' | 'RTP' | 'EGC' | 'NAVTEX' | null;
+  serviceCode?: 'NTX' | 'RTP' | 'EGC' | 'NAVTEX' | null;
+  broadcastCode?: 'MET' | 'NAV' | 'SAR' | 'WX' | 'TUYEN' | null;
+
+  // Signature / end signals
+  hasPersonName: boolean;         // legacy
+  hasSignature?: boolean;         // preferred flag for chữ ký
+  personName?: string;
+  personRole?: string | null;
+
+  // Flags
+  isLogPage: boolean;             // legacy flag for LOG
+  isBanTinNguonHeader?: boolean;  // header "CỘNG HÒA..." của bản tin nguồn
+  hasEmail?: boolean;             // email in log
+  isNewFormStart?: boolean;       // legacy start flag
 }
 
 export interface PDFAnalysisResult {
@@ -186,6 +202,7 @@ export interface SplitDocument {
   id: string;
   filename: string;
   code?: string;     // The detected code (e.g. QT.MSI-BM.01)
+  serviceCode?: string | null; // Service code (NTX, RTP, EGC) for this document
   startPage: number; // 1-based index
   endPage: number;   // 1-based index
   pageCount: number;

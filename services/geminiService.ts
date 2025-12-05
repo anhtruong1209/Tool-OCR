@@ -808,93 +808,141 @@ export const analyzePDFComplete = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-2.5-flash';
 
-  // Gemini 2.5 Flash supports ~20 images per request
-  const BATCH_SIZE = 15;
-  const allBatchResults: PDFAnalysisResult[] = [];
+  // Tối ưu: Tìm LOG page trước, sau đó chia thành 2 batch
+  // Batch 1: Từ đầu đến LOG (bao gồm cả LOG) - để lấy QT.01, KTKS.01, BAN TIN NGUON, LOG
+  // Batch 2: Từ sau LOG đến hết - để lấy tất cả các biểu mẫu còn lại
+  
+  // Bước 1: Phân tích batch đầu tiên (1-10 trang) để tìm LOG
+  const PREVIEW_SIZE = Math.min(10, base64Images.length);
+  const previewImages = base64Images.slice(0, PREVIEW_SIZE);
+  let logPageIndex = -1; // Index trong mảng (0-based)
+  
+  console.log(`[Gemini Service] Preview: Analyzing pages 1-${PREVIEW_SIZE} to find LOG page...`);
+  
+  const previewPrompt = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ: Tìm trang LOG đầu tiên.
 
-  // Process in batches
-  for (let batchStart = 0; batchStart < base64Images.length; batchStart += BATCH_SIZE) {
-    const batchEnd = Math.min(batchStart + BATCH_SIZE, base64Images.length);
-    const batchImages = base64Images.slice(batchStart, batchEnd);
-    const startPageNum = batchStart + 1;
-
-    console.log(`[Gemini Service] Analyzing batch: pages ${startPageNum}-${startPageNum + batchImages.length - 1} (${batchImages.length} pages)`);
-
-    const prompt = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ cốt lõi: Xác định chính xác ĐIỂM BẮT ĐẦU và KẾT THÚC của từng biểu mẫu để chia tách file.
-
-HÃY PHÂN TÍCH TỪNG TRANG THEO 4 QUY TẮC SAU:
-
-1. **PHÁT HIỆN MÃ SỐ (formCode - QUAN TRỌNG NHẤT)**
-   - formCode: CHỈ lấy từ khung "Mã số" hoặc "Code" ở góc trên (trái hoặc phải) của trang.
-   - Khung này thường là một bảng nhỏ, có tiêu đề "Mã số:" hoặc "Code:" và giá trị như "QT.MSI-BM.03", "KTKS.MSI.TC-BM.01", "TTNH-04H00", "ĐBQG".
-   - TUYỆT ĐỐI KHÔNG lấy mã số từ:
-     + Nội dung văn bản (ví dụ: "Mã bản tin nguồn: 3944/2025/VIS-TTNH")
-     + Header/footer
-     + Bất kỳ nơi nào khác ngoài khung "Mã số" ở góc
-   - Nếu KHÔNG có khung "Mã số" ở góc → formCode = null (kể cả khi có mã số ở nơi khác).
-   - Trang LOG (isLogPage = true) → formCode = null (không bao giờ có mã số).
-   
-   - isNewFormStart: true nếu trang có khung "Mã số" ở góc VÀ có tiêu đề lớn in hoa (QUY TRÌNH, PHIẾU KIỂM TRA, BẢN TIN...).
-
-2. **PHÂN TÍCH NGƯỜI KÝ DUYỆT (End Signal - QUAN TRỌNG)**
-   - Chỉ trả về hasPersonName = true nếu tìm thấy tên NGƯỜI CÓ THẨM QUYỀN KÝ CHỐT (Approver) ở CUỐI TRANG (phần dưới cùng của trang).
-   - Tên người phải nằm ở phần cuối trang, thường kèm theo:
-     + "Người thực hiện", "Trực ban", "Dự báo viên", "GIÁM ĐỐC", "TRƯỞNG/PHÓ PHÒNG"
-     + Hoặc chỉ có tên người (như "Đồng Thanh Hải", "Lê Tiến Hải") ở cuối trang
-   - LOẠI TRỪ TUYỆT ĐỐI:
-     + Tên người ở giữa trang (không phải cuối trang)
-     + "Soát tin", "Người lập", "Kíp trực" (không phải người ký chốt)
-     + Tên trong nội dung văn bản (không phải phần ký)
-   - QUAN TRỌNG: Nếu tên người ở giữa trang hoặc không ở cuối trang → hasPersonName = false
-   - Nếu có -> Lấy personName và personRole.
-
-3. **TRÍCH XUẤT THÔNG TIN METADATA**
-   - Broadcast Code: MET, NAV, SAR, WX, TUYEN (tìm trong header/mã bản tin).
-   - Service Code: NTX, RTP, EGC (tìm trong mã bản tin đài xử lý).
-   - Service Hint: Tìm chuỗi "-NTX", "-RTP", "-EGC" để gợi ý.
-   - isBanTinNguonHeader: CHỈ true nếu:
-     + Có header "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" ở đầu trang
-     + VÀ KHÔNG có formCode (không có khung "Mã số" ở góc)
-     + VÀ KHÔNG phải là trang của biểu mẫu QT/KTKS (không có tiêu đề "QUY TRÌNH PHÁT", "PHIẾU KIỂM TRA")
-     + VÀ là nội dung bản tin gốc (không phải "BẢN TIN NGUỒN ĐÃ ĐƯỢC XỬ LÝ" hay "BẢN TIN XỬ LÝ TRƯỚC KHI PHÁT")
-     + Ví dụ: Trang có header "CỘNG HÒA..." và tiêu đề "TIN BÃO TRÊN BIỂN ĐÔNG" → isBanTinNguonHeader = true
-     + Ví dụ: Trang có header "CỘNG HÒA..." nhưng có formCode "QT.MSI-BM.02" → isBanTinNguonHeader = false
-     + Ví dụ: Trang có header "CỘNG HÒA..." nhưng có tiêu đề "BẢN TIN NGUỒN ĐÃ ĐƯỢC XỬ LÝ" → isBanTinNguonHeader = false
-
-4. **PHÂN TÍCH LOG/EMAIL**
-   - isLogPage: Trang chụp màn hình, bảng log, email in.
-   - hasEmail: Có địa chỉ email trong trang log.
+PHÂN TÍCH TỪNG TRANG:
+- isLogPage: true nếu trang là LOG (chụp màn hình, bảng log, email in, không có formCode, không có tiêu đề biểu mẫu).
+- Trang LOG thường có: ảnh chụp màn hình, bảng log, email, không có "Mã số" ở góc.
 
 OUTPUT JSON FORMAT (Chỉ trả về JSON):
 {
-  "broadcastCode": "MET"|"NAV"|"SAR"|"WX"|"TUYEN"|null,
-  "serviceCode": "NTX"|"RTP"|"EGC"|null,
   "pages": [
     {
-      "page": ${startPageNum},
-      "formCode": "QT.MSI-BM.03" | "KTKS.MSI.TC-BM.01" | null,
-      "isNewFormStart": true | false,
-      "hasPersonName": true | false,
-      "personName": "Nguyễn Văn A" | null,
-      "personRole": "Trực ban" | null,
-      "isLogPage": true | false,
-      "isBanTinNguonHeader": true | false,
-      "hasEmail": true | false,
-      "serviceHint": "NTX" | "RTP" | "EGC" | null
+      "page": 1,
+      "isLogPage": true | false
     },
     ...
   ]
 }`;
 
+  const previewContentParts: any[] = previewImages.map(img => ({
+    inlineData: {
+      mimeType: 'image/jpeg',
+      data: img,
+    },
+  }));
+  previewContentParts.push({ text: previewPrompt });
+
+  try {
+    const previewResponse = await ai.models.generateContent({
+      model: model,
+      contents: {
+        parts: previewContentParts,
+      },
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0,
+      },
+    });
+
+    const previewJsonText = previewResponse.text?.trim();
+    if (previewJsonText) {
+      const previewResult = JSON.parse(previewJsonText);
+      // Tìm LOG page đầu tiên
+      for (const page of previewResult.pages || []) {
+        if (page.isLogPage === true) {
+          logPageIndex = page.page - 1; // Convert to 0-based index
+          console.log(`[Gemini Service] Found LOG at page ${page.page} (index ${logPageIndex})`);
+          break;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[Gemini Service] Preview analysis failed, will use default split:', error);
+  }
+
+  // Nếu không tìm thấy LOG trong preview, dùng mặc định là trang 8
+  if (logPageIndex === -1) {
+    logPageIndex = Math.min(7, base64Images.length - 1); // Trang 8 (index 7)
+    console.log(`[Gemini Service] LOG not found in preview, using default split at page ${logPageIndex + 1}`);
+  }
+
+  const allBatchResults: PDFAnalysisResult[] = [];
+
+  // Prompt template cho các batch (schema mới)
+  const promptTemplate = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Hãy phân loại MỖI TRANG vào 4 loại:
+- FORM_HEADER: Trang có khung "Mã số"/"Code" ở góc (QT.MSI-..., KTKS.MSI-...).
+- LOG_SCREEN: Trang chụp màn hình (Total Commander/FileZilla/email), không có formCode.
+- SOURCE_HEADER: Trang đầu bản tin gốc (có "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" hoặc header bản tin), KHÔNG có formCode.
+- CONTENT: Trang nội dung tiếp theo.
+
+YÊU CẦU TRÍCH XUẤT:
+- page: số trang (1-based).
+- type: FORM_HEADER | LOG_SCREEN | SOURCE_HEADER | CONTENT.
+- formCode: chỉ lấy từ khung "Mã số/Code" ở góc; nếu không thấy → null.
+- serviceHint: NTX | RTP | EGC | NAVTEX | null (từ mã đài xử lý hoặc dấu hiệu trên trang).
+- broadcastCode: MET | NAV | SAR | WX | TUYEN | null (nếu nhận ra).
+- hasSignature: true nếu có chữ ký/tên người ở cuối trang (chỉ phần ký duyệt, không phải tên trong nội dung).
+- isLogPage: true nếu LOG_SCREEN, false otherwise.
+- isBanTinNguonHeader: true chỉ khi là SOURCE_HEADER (header "CỘNG HÒA..." và không có formCode).
+- hasEmail: true nếu trang log có địa chỉ email.
+
+LƯU Ý:
+- LOG_SCREEN luôn có formCode = null.
+- FORM_HEADER luôn có formCode khác null.
+- SOURCE_HEADER không có formCode.
+- Nếu thấy NAVTEX trên trang, serviceHint = NTX (map NAVTEX → NTX).
+
+OUTPUT JSON (chỉ JSON, không giải thích):
+{
+  "broadcastCode": "MET"|"NAV"|"SAR"|"WX"|"TUYEN"|null,
+  "serviceCode": "NTX"|"RTP"|"EGC"|null,
+  "pages": [
+    {
+      "page": 1,
+      "type": "FORM_HEADER" | "LOG_SCREEN" | "SOURCE_HEADER" | "CONTENT",
+      "formCode": "QT.MSI-BM.03" | "KTKS.MSI.TC-BM.01" | null,
+      "serviceHint": "NTX" | "RTP" | "EGC" | "NAVTEX" | null,
+      "broadcastCode": "MET" | "NAV" | "SAR" | "WX" | "TUYEN" | null,
+      "hasSignature": true | false,
+      "isLogPage": true | false,
+      "isBanTinNguonHeader": true | false,
+      "hasEmail": true | false
+    }
+  ]
+}`;
+
+  // Batch 1: Từ đầu đến LOG (bao gồm cả LOG)
+  const batch1End = logPageIndex + 1; // +1 để bao gồm LOG
+  const batch1Images = base64Images.slice(0, batch1End);
+  
+  if (batch1Images.length > 0) {
+    console.log(`[Gemini Service] Analyzing batch 1: pages 1-${batch1End} (${batch1Images.length} pages, includes LOG)`);
+
+    const prompt = promptTemplate;
+
     // Prepare content parts with all images in batch
-    const contentParts: any[] = batchImages.map(img => ({
+    const contentParts: any[] = batch1Images.map(img => ({
       inlineData: {
         mimeType: 'image/jpeg',
         data: img,
       },
     }));
 
-    contentParts.push({ text: prompt });
+    const startPageNum1 = 1;
+    const prompt1 = prompt.replace(/\$\{startPageNum\}/g, startPageNum1.toString());
+    contentParts.push({ text: prompt1 });
 
     try {
       const response = await ai.models.generateContent({
@@ -910,56 +958,299 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON):
 
       const jsonText = response.text?.trim();
       if (!jsonText) {
-        console.error(`[Gemini Service] No response for batch ${startPageNum}-${startPageNum + batchImages.length - 1}`);
+        console.error(`[Gemini Service] No response for batch 1`);
         // Return empty result for this batch
         allBatchResults.push({
           broadcastCode: null,
           serviceCode: null,
-          pages: batchImages.map((_, idx) => ({
-            page: startPageNum + idx,
+          pages: batch1Images.map((_, idx) => ({
+            page: startPageNum1 + idx,
             code: null,
             hasPersonName: false,
-            isLogPage: true
+            isLogPage: false
           }))
         });
-        continue;
+      } else {
+        let batchResult: PDFAnalysisResult;
+        try {
+          batchResult = JSON.parse(jsonText);
+          allBatchResults.push(batchResult);
+        } catch (parseError) {
+          console.error(`[Gemini Service] JSON parse error for batch 1:`, jsonText);
+          // Return empty result for this batch
+          allBatchResults.push({
+            broadcastCode: null,
+            serviceCode: null,
+            pages: batch1Images.map((_, idx) => ({
+              page: startPageNum1 + idx,
+              code: null,
+              hasPersonName: false,
+              isLogPage: false
+            }))
+          });
+        }
       }
-
-      let batchResult: PDFAnalysisResult;
-      try {
-        batchResult = JSON.parse(jsonText);
-      } catch (parseError) {
-        console.error(`[Gemini Service] JSON parse error for batch ${startPageNum}:`, jsonText);
-        // Return empty result for this batch
-        allBatchResults.push({
-          broadcastCode: null,
-          serviceCode: null,
-          pages: batchImages.map((_, idx) => ({
-            page: startPageNum + idx,
-            code: null,
-            hasPersonName: false,
-            isLogPage: true
-          }))
-        });
-        continue;
-      }
-
-      allBatchResults.push(batchResult);
-
     } catch (error) {
-      console.error(`[Gemini Service] Error analyzing batch ${startPageNum}:`, error);
+      console.error(`[Gemini Service] Error analyzing batch 1:`, error);
       // Return empty result for this batch
       allBatchResults.push({
         broadcastCode: null,
         serviceCode: null,
-        pages: batchImages.map((_, idx) => ({
-          page: startPageNum + idx,
+        pages: batch1Images.map((_, idx) => ({
+          page: startPageNum1 + idx,
           code: null,
           hasPersonName: false,
-          isLogPage: true
+          isLogPage: false
         }))
       });
     }
+  }
+
+  // Batch 2: Từ sau LOG đến hết QT.MSI-BM.04 của dịch vụ đầu tiên
+  // Đầu tiên, phân tích một phần để tìm BM.04
+  const batch2Start = logPageIndex + 1; // Bắt đầu từ sau LOG
+  const preview2Size = Math.min(20, base64Images.length - batch2Start); // Preview 20 trang đầu của batch 2
+  const preview2Images = base64Images.slice(batch2Start, batch2Start + preview2Size);
+  
+  let bm04PageIndex = -1; // Index của QT.MSI-BM.04 đầu tiên (0-based trong toàn bộ file)
+  let firstServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
+  
+  // Preview batch 2 để tìm BM.04
+  if (preview2Images.length > 0) {
+    console.log(`[Gemini Service] Preview batch 2: Analyzing pages ${batch2Start + 1}-${batch2Start + preview2Size} to find BM.04...`);
+    
+    const preview2Prompt = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ: Tìm trang QT.MSI-BM.04 đầu tiên của dịch vụ đầu tiên.
+
+PHÂN TÍCH TỪNG TRANG:
+- formCode: Mã số ở khung góc (ví dụ: "QT.MSI-BM.04", "QT.MSI-BM.02")
+- serviceCode: NTX, RTP, hoặc EGC (tìm trong mã bản tin đài xử lý)
+
+OUTPUT JSON FORMAT (Chỉ trả về JSON):
+{
+  "serviceCode": "NTX"|"RTP"|"EGC"|null,
+  "pages": [
+    {
+      "page": 1,
+      "formCode": "QT.MSI-BM.04" | "QT.MSI-BM.02" | null,
+      "serviceCode": "NTX" | "RTP" | "EGC" | null
+    },
+    ...
+  ]
+}`;
+
+    const preview2ContentParts: any[] = preview2Images.map(img => ({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: img,
+      },
+    }));
+    preview2ContentParts.push({ text: preview2Prompt });
+
+    try {
+      const preview2Response = await ai.models.generateContent({
+        model: model,
+        contents: {
+          parts: preview2ContentParts,
+        },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0,
+        },
+      });
+
+      const preview2JsonText = preview2Response.text?.trim();
+      if (preview2JsonText) {
+        const preview2Result = JSON.parse(preview2JsonText);
+        // Lấy serviceCode đầu tiên
+        if (preview2Result.serviceCode) {
+          firstServiceCode = preview2Result.serviceCode;
+        }
+        // Tìm QT.MSI-BM.04 đầu tiên của dịch vụ đầu tiên
+        for (const page of preview2Result.pages || []) {
+          if (!firstServiceCode && page.serviceCode) {
+            firstServiceCode = page.serviceCode;
+          }
+          if (bm04PageIndex === -1 && page.formCode && 
+              (page.formCode.includes('BM.04') || page.formCode.includes('BM-04')) &&
+              (page.serviceCode === firstServiceCode || (!page.serviceCode && firstServiceCode))) {
+            bm04PageIndex = batch2Start + (page.page - 1); // Convert to global index
+            console.log(`[Gemini Service] Found first QT.MSI-BM.04 (${firstServiceCode || 'unknown'}) at page ${bm04PageIndex + 1}`);
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[Gemini Service] Preview batch 2 analysis failed:', error);
+    }
+  }
+
+  // Batch 2: Từ sau LOG đến hết BM.04 (nếu tìm thấy) hoặc đến hết (nếu không tìm thấy)
+  const batch2End = bm04PageIndex !== -1 ? bm04PageIndex + 1 : base64Images.length; // Kết thúc ở sau BM.04 hoặc hết file
+  const batch2Images = base64Images.slice(batch2Start, batch2End);
+  
+  if (batch2Images.length > 0) {
+    console.log(`[Gemini Service] Analyzing batch 2: pages ${batch2Start + 1}-${batch2End} (${batch2Images.length} pages, after LOG to BM.04)`);
+
+    const startPageNum2 = batch2Start + 1;
+    // Update page numbers in the prompt for batch 2
+    const prompt2 = promptTemplate.replace(/"page": 1/g, `"page": ${startPageNum2}`);
+
+    // Prepare content parts with all images in batch
+    const contentParts2: any[] = batch2Images.map(img => ({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: img,
+      },
+    }));
+
+    contentParts2.push({ text: prompt2 });
+
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: {
+          parts: contentParts2,
+        },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0,
+        },
+      });
+
+      const jsonText = response.text?.trim();
+      if (!jsonText) {
+        console.error(`[Gemini Service] No response for batch 2`);
+        // Return empty result for this batch
+        allBatchResults.push({
+          broadcastCode: null,
+          serviceCode: null,
+          pages: batch2Images.map((_, idx) => ({
+            page: startPageNum2 + idx,
+            code: null,
+            hasPersonName: false,
+            isLogPage: false
+          }))
+        });
+      } else {
+        let batchResult: PDFAnalysisResult;
+        try {
+          batchResult = JSON.parse(jsonText);
+          allBatchResults.push(batchResult);
+        } catch (parseError) {
+          console.error(`[Gemini Service] JSON parse error for batch 2:`, jsonText);
+          // Return empty result for this batch
+          allBatchResults.push({
+            broadcastCode: null,
+            serviceCode: null,
+            pages: batch2Images.map((_, idx) => ({
+              page: startPageNum2 + idx,
+              code: null,
+              hasPersonName: false,
+              isLogPage: false
+            }))
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[Gemini Service] Error analyzing batch 2:`, error);
+      // Return empty result for this batch
+      allBatchResults.push({
+        broadcastCode: null,
+        serviceCode: null,
+        pages: batch2Images.map((_, idx) => ({
+          page: startPageNum2 + idx,
+          code: null,
+          hasPersonName: false,
+          isLogPage: false
+        }))
+      });
+    }
+  }
+
+  // Batch 3: Từ sau QT.MSI-BM.04 của dịch vụ đầu tiên đến hết
+  // Nếu không tìm thấy BM.04, batch 3 sẽ rỗng
+  const batch3Start = bm04PageIndex !== -1 ? bm04PageIndex + 1 : base64Images.length; // Bắt đầu từ sau BM.04
+  const batch3Images = base64Images.slice(batch3Start);
+  
+  if (batch3Images.length > 0 && bm04PageIndex !== -1) {
+    console.log(`[Gemini Service] Analyzing batch 3: pages ${batch3Start + 1}-${base64Images.length} (${batch3Images.length} pages, after first BM.04)`);
+
+    const startPageNum3 = batch3Start + 1;
+    // Update page numbers in the prompt for batch 3
+    const prompt3 = promptTemplate.replace(/"page": 1/g, `"page": ${startPageNum3}`);
+
+    // Prepare content parts with all images in batch
+    const contentParts3: any[] = batch3Images.map(img => ({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: img,
+      },
+    }));
+
+    contentParts3.push({ text: prompt3 });
+
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: {
+          parts: contentParts3,
+        },
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0,
+        },
+      });
+
+      const jsonText = response.text?.trim();
+      if (!jsonText) {
+        console.error(`[Gemini Service] No response for batch 3`);
+        // Return empty result for this batch
+        allBatchResults.push({
+          broadcastCode: null,
+          serviceCode: null,
+          pages: batch3Images.map((_, idx) => ({
+            page: startPageNum3 + idx,
+            code: null,
+            hasPersonName: false,
+            isLogPage: false
+          }))
+        });
+      } else {
+        let batchResult: PDFAnalysisResult;
+        try {
+          batchResult = JSON.parse(jsonText);
+          allBatchResults.push(batchResult);
+        } catch (parseError) {
+          console.error(`[Gemini Service] JSON parse error for batch 3:`, jsonText);
+          // Return empty result for this batch
+          allBatchResults.push({
+            broadcastCode: null,
+            serviceCode: null,
+            pages: batch3Images.map((_, idx) => ({
+              page: startPageNum3 + idx,
+              code: null,
+              hasPersonName: false,
+              isLogPage: false
+            }))
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[Gemini Service] Error analyzing batch 3:`, error);
+      // Return empty result for this batch
+      allBatchResults.push({
+        broadcastCode: null,
+        serviceCode: null,
+        pages: batch3Images.map((_, idx) => ({
+          page: startPageNum3 + idx,
+          code: null,
+          hasPersonName: false,
+          isLogPage: false
+        }))
+      });
+    }
+  } else if (bm04PageIndex === -1) {
+    console.log(`[Gemini Service] BM.04 not found, skipping batch 3`);
   }
 
   // Merge results from all batches
@@ -967,6 +1258,7 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON):
   let finalServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
   const allPages: PageAnalysis[] = [];
 
+  let batchIndex = 0;
   for (const batchResult of allBatchResults) {
     // Take first non-null broadcast/service code
     if (!finalBroadcastCode && batchResult.broadcastCode) {
@@ -976,8 +1268,26 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON):
       finalServiceCode = batchResult.serviceCode;
     }
 
-    // Collect all pages
-    allPages.push(...batchResult.pages);
+    // Collect all pages, updating page numbers for each batch
+    if (batchIndex === 0) {
+      // Batch 1: pages start from 1
+      allPages.push(...batchResult.pages);
+    } else if (batchIndex === 1) {
+      // Batch 2: pages need to be offset by batch2Start
+      const adjustedPages = batchResult.pages.map(p => ({
+        ...p,
+        page: p.page + batch2Start
+      }));
+      allPages.push(...adjustedPages);
+    } else {
+      // Batch 3: pages need to be offset by batch3Start
+      const adjustedPages = batchResult.pages.map(p => ({
+        ...p,
+        page: p.page + batch3Start
+      }));
+      allPages.push(...adjustedPages);
+    }
+    batchIndex++;
   }
 
   console.log(`[Gemini Service] Analysis complete: ${allPages.length} pages, broadcast: ${finalBroadcastCode}, service: ${finalServiceCode}`);
