@@ -11,6 +11,8 @@ import {
   PageAnalysis
 } from '../types';
 
+const MODEL_FALLBACKS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+
 // --- BAN TIN NGUON KEYWORDS CONFIG ---
 export const BAN_TIN_NGUON_KEYWORDS: BanTinNguonKeywords = {
   codePatterns: ['TTNH', 'ĐBQG', 'DBQG', '04H00'],
@@ -237,7 +239,7 @@ export const analyzeDocument = async (base64Images: string[], type: DocumentType
 
   try {
     const response = await ai.models.generateContent({
-      model: model,
+      model: MODEL_FALLBACKS[0],
       contents: {
         parts: contentParts,
       },
@@ -289,7 +291,6 @@ export const detectBroadcastAndServiceCode = async (
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const model = 'gemini-2.5-flash';
 
   let detectedBroadcastCode: 'MET' | 'NAV' | 'SAR' | 'WX' | 'TUYEN' | null = null;
   let detectedServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
@@ -338,7 +339,7 @@ CHỈ trả về JSON, không có text giải thích nào khác.`;
       contentParts.push({ text: prompt } as any);
 
       const response = await ai.models.generateContent({
-        model: model,
+        model: MODEL_FALLBACKS[0],
         contents: {
           parts: contentParts,
         },
@@ -923,334 +924,96 @@ OUTPUT JSON (chỉ JSON, không giải thích):
   ]
 }`;
 
-  // Batch 1: Từ đầu đến LOG (bao gồm cả LOG)
-  const batch1End = logPageIndex + 1; // +1 để bao gồm LOG
-  const batch1Images = base64Images.slice(0, batch1End);
-  
-  if (batch1Images.length > 0) {
-    console.log(`[Gemini Service] Analyzing batch 1: pages 1-${batch1End} (${batch1Images.length} pages, includes LOG)`);
+  // Chia đúng 2 batch bằng nửa file
+  const splitIndex = Math.ceil(base64Images.length / 2);
+  const batches = [
+    { start: 0, end: splitIndex },
+    { start: splitIndex, end: base64Images.length }
+  ];
 
-    const prompt = promptTemplate;
+  for (let i = 0; i < batches.length; i++) {
+    const { start, end } = batches[i];
+    const images = base64Images.slice(start, end);
+    if (images.length === 0) continue;
 
-    // Prepare content parts with all images in batch
-    const contentParts: any[] = batch1Images.map(img => ({
+    const startPageNum = start + 1;
+    const prompt = promptTemplate.replace(/"page": 1/g, `"page": ${startPageNum}`);
+
+    console.log(`[Gemini Service] Analyzing batch ${i + 1}: pages ${startPageNum}-${startPageNum + images.length - 1} (${images.length} pages)`);
+
+    const contentParts: any[] = images.map(img => ({
       inlineData: {
         mimeType: 'image/jpeg',
         data: img,
       },
     }));
+    contentParts.push({ text: prompt });
 
-    const startPageNum1 = 1;
-    const prompt1 = prompt.replace(/\$\{startPageNum\}/g, startPageNum1.toString());
-    contentParts.push({ text: prompt1 });
+    let success = false;
+    let batchResult: PDFAnalysisResult | null = null;
 
-    try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: {
-          parts: contentParts,
-        },
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0,
-        },
-      });
+    for (let m = 0; m < MODEL_FALLBACKS.length && !success; m++) {
+      const model = MODEL_FALLBACKS[m];
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: {
+            parts: contentParts,
+          },
+          config: {
+            responseMimeType: "application/json",
+            temperature: 0,
+          },
+        });
 
-      const jsonText = response.text?.trim();
-      if (!jsonText) {
-        console.error(`[Gemini Service] No response for batch 1`);
-        // Return empty result for this batch
+        const jsonText = response.text?.trim();
+        if (!jsonText) {
+          throw new Error('empty_response');
+        }
+
+        try {
+          const parsed = JSON.parse(jsonText);
+          const adjustedPages = parsed.pages.map((p: any) => ({
+            ...p,
+            page: (p.page || 1) + start
+          }));
+          batchResult = {
+            broadcastCode: parsed.broadcastCode,
+            serviceCode: parsed.serviceCode,
+            pages: adjustedPages
+          };
+          success = true;
+        } catch (parseError) {
+          console.error(`[Gemini Service] JSON parse error for batch ${i + 1} on model ${model}:`, jsonText);
+          throw parseError;
+        }
+      } catch (err: any) {
+        const isRateLimit = err?.message?.includes('429') || err?.message?.includes('quota');
+        const isEmpty = err?.message === 'empty_response';
+        console.warn(`[Gemini Service] Model ${model} failed for batch ${i + 1}:`, err?.message || err);
+        // Try next model if available
+        if (m < MODEL_FALLBACKS.length - 1) {
+          // small delay before next model
+          await new Promise(res => setTimeout(res, isRateLimit ? 1500 : 300));
+          continue;
+        }
+        // Out of fallbacks
         allBatchResults.push({
           broadcastCode: null,
           serviceCode: null,
-          pages: batch1Images.map((_, idx) => ({
-            page: startPageNum1 + idx,
+          pages: images.map((_, idx) => ({
+            page: startPageNum + idx,
             code: null,
             hasPersonName: false,
             isLogPage: false
           }))
         });
-      } else {
-        let batchResult: PDFAnalysisResult;
-        try {
-          batchResult = JSON.parse(jsonText);
-          allBatchResults.push(batchResult);
-        } catch (parseError) {
-          console.error(`[Gemini Service] JSON parse error for batch 1:`, jsonText);
-          // Return empty result for this batch
-          allBatchResults.push({
-            broadcastCode: null,
-            serviceCode: null,
-            pages: batch1Images.map((_, idx) => ({
-              page: startPageNum1 + idx,
-              code: null,
-              hasPersonName: false,
-              isLogPage: false
-            }))
-          });
-        }
       }
-    } catch (error) {
-      console.error(`[Gemini Service] Error analyzing batch 1:`, error);
-      // Return empty result for this batch
-      allBatchResults.push({
-        broadcastCode: null,
-        serviceCode: null,
-        pages: batch1Images.map((_, idx) => ({
-          page: startPageNum1 + idx,
-          code: null,
-          hasPersonName: false,
-          isLogPage: false
-        }))
-      });
     }
-  }
 
-  // Batch 2: Từ sau LOG đến hết QT.MSI-BM.04 của dịch vụ đầu tiên
-  // Đầu tiên, phân tích một phần để tìm BM.04
-  const batch2Start = logPageIndex + 1; // Bắt đầu từ sau LOG
-  const preview2Size = Math.min(20, base64Images.length - batch2Start); // Preview 20 trang đầu của batch 2
-  const preview2Images = base64Images.slice(batch2Start, batch2Start + preview2Size);
-  
-  let bm04PageIndex = -1; // Index của QT.MSI-BM.04 đầu tiên (0-based trong toàn bộ file)
-  let firstServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
-  
-  // Preview batch 2 để tìm BM.04
-  if (preview2Images.length > 0) {
-    console.log(`[Gemini Service] Preview batch 2: Analyzing pages ${batch2Start + 1}-${batch2Start + preview2Size} to find BM.04...`);
-    
-    const preview2Prompt = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ: Tìm trang QT.MSI-BM.04 đầu tiên của dịch vụ đầu tiên.
-
-PHÂN TÍCH TỪNG TRANG:
-- formCode: Mã số ở khung góc (ví dụ: "QT.MSI-BM.04", "QT.MSI-BM.02")
-- serviceCode: NTX, RTP, hoặc EGC (tìm trong mã bản tin đài xử lý)
-
-OUTPUT JSON FORMAT (Chỉ trả về JSON):
-{
-  "serviceCode": "NTX"|"RTP"|"EGC"|null,
-  "pages": [
-    {
-      "page": 1,
-      "formCode": "QT.MSI-BM.04" | "QT.MSI-BM.02" | null,
-      "serviceCode": "NTX" | "RTP" | "EGC" | null
-    },
-    ...
-  ]
-}`;
-
-    const preview2ContentParts: any[] = preview2Images.map(img => ({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: img,
-      },
-    }));
-    preview2ContentParts.push({ text: preview2Prompt });
-
-    try {
-      const preview2Response = await ai.models.generateContent({
-        model: model,
-        contents: {
-          parts: preview2ContentParts,
-        },
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0,
-        },
-      });
-
-      const preview2JsonText = preview2Response.text?.trim();
-      if (preview2JsonText) {
-        const preview2Result = JSON.parse(preview2JsonText);
-        // Lấy serviceCode đầu tiên
-        if (preview2Result.serviceCode) {
-          firstServiceCode = preview2Result.serviceCode;
-        }
-        // Tìm QT.MSI-BM.04 đầu tiên của dịch vụ đầu tiên
-        for (const page of preview2Result.pages || []) {
-          if (!firstServiceCode && page.serviceCode) {
-            firstServiceCode = page.serviceCode;
-          }
-          if (bm04PageIndex === -1 && page.formCode && 
-              (page.formCode.includes('BM.04') || page.formCode.includes('BM-04')) &&
-              (page.serviceCode === firstServiceCode || (!page.serviceCode && firstServiceCode))) {
-            bm04PageIndex = batch2Start + (page.page - 1); // Convert to global index
-            console.log(`[Gemini Service] Found first QT.MSI-BM.04 (${firstServiceCode || 'unknown'}) at page ${bm04PageIndex + 1}`);
-            break;
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('[Gemini Service] Preview batch 2 analysis failed:', error);
+    if (success && batchResult) {
+      allBatchResults.push(batchResult);
     }
-  }
-
-  // Batch 2: Từ sau LOG đến hết BM.04 (nếu tìm thấy) hoặc đến hết (nếu không tìm thấy)
-  const batch2End = bm04PageIndex !== -1 ? bm04PageIndex + 1 : base64Images.length; // Kết thúc ở sau BM.04 hoặc hết file
-  const batch2Images = base64Images.slice(batch2Start, batch2End);
-  
-  if (batch2Images.length > 0) {
-    console.log(`[Gemini Service] Analyzing batch 2: pages ${batch2Start + 1}-${batch2End} (${batch2Images.length} pages, after LOG to BM.04)`);
-
-    const startPageNum2 = batch2Start + 1;
-    // Update page numbers in the prompt for batch 2
-    const prompt2 = promptTemplate.replace(/"page": 1/g, `"page": ${startPageNum2}`);
-
-    // Prepare content parts with all images in batch
-    const contentParts2: any[] = batch2Images.map(img => ({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: img,
-      },
-    }));
-
-    contentParts2.push({ text: prompt2 });
-
-    try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: {
-          parts: contentParts2,
-        },
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0,
-        },
-      });
-
-      const jsonText = response.text?.trim();
-      if (!jsonText) {
-        console.error(`[Gemini Service] No response for batch 2`);
-        // Return empty result for this batch
-        allBatchResults.push({
-          broadcastCode: null,
-          serviceCode: null,
-          pages: batch2Images.map((_, idx) => ({
-            page: startPageNum2 + idx,
-            code: null,
-            hasPersonName: false,
-            isLogPage: false
-          }))
-        });
-      } else {
-        let batchResult: PDFAnalysisResult;
-        try {
-          batchResult = JSON.parse(jsonText);
-          allBatchResults.push(batchResult);
-        } catch (parseError) {
-          console.error(`[Gemini Service] JSON parse error for batch 2:`, jsonText);
-          // Return empty result for this batch
-          allBatchResults.push({
-            broadcastCode: null,
-            serviceCode: null,
-            pages: batch2Images.map((_, idx) => ({
-              page: startPageNum2 + idx,
-              code: null,
-              hasPersonName: false,
-              isLogPage: false
-            }))
-          });
-        }
-      }
-    } catch (error) {
-      console.error(`[Gemini Service] Error analyzing batch 2:`, error);
-      // Return empty result for this batch
-      allBatchResults.push({
-        broadcastCode: null,
-        serviceCode: null,
-        pages: batch2Images.map((_, idx) => ({
-          page: startPageNum2 + idx,
-          code: null,
-          hasPersonName: false,
-          isLogPage: false
-        }))
-      });
-    }
-  }
-
-  // Batch 3: Từ sau QT.MSI-BM.04 của dịch vụ đầu tiên đến hết
-  // Nếu không tìm thấy BM.04, batch 3 sẽ rỗng
-  const batch3Start = bm04PageIndex !== -1 ? bm04PageIndex + 1 : base64Images.length; // Bắt đầu từ sau BM.04
-  const batch3Images = base64Images.slice(batch3Start);
-  
-  if (batch3Images.length > 0 && bm04PageIndex !== -1) {
-    console.log(`[Gemini Service] Analyzing batch 3: pages ${batch3Start + 1}-${base64Images.length} (${batch3Images.length} pages, after first BM.04)`);
-
-    const startPageNum3 = batch3Start + 1;
-    // Update page numbers in the prompt for batch 3
-    const prompt3 = promptTemplate.replace(/"page": 1/g, `"page": ${startPageNum3}`);
-
-    // Prepare content parts with all images in batch
-    const contentParts3: any[] = batch3Images.map(img => ({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: img,
-      },
-    }));
-
-    contentParts3.push({ text: prompt3 });
-
-    try {
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: {
-          parts: contentParts3,
-        },
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0,
-        },
-      });
-
-      const jsonText = response.text?.trim();
-      if (!jsonText) {
-        console.error(`[Gemini Service] No response for batch 3`);
-        // Return empty result for this batch
-        allBatchResults.push({
-          broadcastCode: null,
-          serviceCode: null,
-          pages: batch3Images.map((_, idx) => ({
-            page: startPageNum3 + idx,
-            code: null,
-            hasPersonName: false,
-            isLogPage: false
-          }))
-        });
-      } else {
-        let batchResult: PDFAnalysisResult;
-        try {
-          batchResult = JSON.parse(jsonText);
-          allBatchResults.push(batchResult);
-        } catch (parseError) {
-          console.error(`[Gemini Service] JSON parse error for batch 3:`, jsonText);
-          // Return empty result for this batch
-          allBatchResults.push({
-            broadcastCode: null,
-            serviceCode: null,
-            pages: batch3Images.map((_, idx) => ({
-              page: startPageNum3 + idx,
-              code: null,
-              hasPersonName: false,
-              isLogPage: false
-            }))
-          });
-        }
-      }
-    } catch (error) {
-      console.error(`[Gemini Service] Error analyzing batch 3:`, error);
-      // Return empty result for this batch
-      allBatchResults.push({
-        broadcastCode: null,
-        serviceCode: null,
-        pages: batch3Images.map((_, idx) => ({
-          page: startPageNum3 + idx,
-          code: null,
-          hasPersonName: false,
-          isLogPage: false
-        }))
-      });
-    }
-  } else if (bm04PageIndex === -1) {
-    console.log(`[Gemini Service] BM.04 not found, skipping batch 3`);
   }
 
   // Merge results from all batches
@@ -1258,36 +1021,14 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON):
   let finalServiceCode: 'NTX' | 'RTP' | 'EGC' | null = null;
   const allPages: PageAnalysis[] = [];
 
-  let batchIndex = 0;
   for (const batchResult of allBatchResults) {
-    // Take first non-null broadcast/service code
     if (!finalBroadcastCode && batchResult.broadcastCode) {
       finalBroadcastCode = batchResult.broadcastCode;
     }
     if (!finalServiceCode && batchResult.serviceCode) {
       finalServiceCode = batchResult.serviceCode;
     }
-
-    // Collect all pages, updating page numbers for each batch
-    if (batchIndex === 0) {
-      // Batch 1: pages start from 1
-      allPages.push(...batchResult.pages);
-    } else if (batchIndex === 1) {
-      // Batch 2: pages need to be offset by batch2Start
-      const adjustedPages = batchResult.pages.map(p => ({
-        ...p,
-        page: p.page + batch2Start
-      }));
-      allPages.push(...adjustedPages);
-    } else {
-      // Batch 3: pages need to be offset by batch3Start
-      const adjustedPages = batchResult.pages.map(p => ({
-        ...p,
-        page: p.page + batch3Start
-      }));
-      allPages.push(...adjustedPages);
-    }
-    batchIndex++;
+    allPages.push(...batchResult.pages);
   }
 
   console.log(`[Gemini Service] Analysis complete: ${allPages.length} pages, broadcast: ${finalBroadcastCode}, service: ${finalServiceCode}`);

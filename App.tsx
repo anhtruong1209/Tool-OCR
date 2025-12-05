@@ -267,16 +267,16 @@ const App: React.FC = () => {
                   </div>
                 </section>
 
-                <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr] items-start">
-                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4">
+                <section className="grid gap-4 lg:grid-cols-2 items-start">
+                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4 transition hover:shadow-lg hover:border-indigo-200">
                     <div className="flex flex-col gap-2 text-left">
-                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 1: Chọn thư mục</p>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 1</p>
                       <h3 className="text-xl font-semibold text-slate-900">Chọn thư mục lưu kết quả</h3>
                       <p className="text-sm text-slate-500">Chọn thư mục đích trước khi tải file PDF lên.</p>
                     </div>
                     <button
                       onClick={handleSelectDestinationFolder}
-                      className="w-full px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-3 text-sm"
+                      className="w-full px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 text-sm"
                     >
                       <FolderOpen size={20} />
                       {directoryInfo ? `Đã chọn: ${directoryInfo.name}` : 'Chọn thư mục lưu file'}
@@ -288,9 +288,9 @@ const App: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4">
+                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4 transition hover:shadow-lg hover:border-indigo-200">
                     <div className="flex flex-col gap-2 text-left">
-                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 2: Upload</p>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 2</p>
                       <h3 className="text-xl font-semibold text-slate-900">Tải lên file PDF</h3>
                       <p className="text-sm text-slate-500">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
                     </div>
@@ -309,72 +309,7 @@ const App: React.FC = () => {
                         : 'Vui lòng chọn thư mục lưu kết quả trước khi upload file.'}
                     </div>
                   </div>
-
-                  {docType === 'SPLIT' && (
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 text-white shadow-md border border-white/10 text-left min-h-[180px] flex flex-col">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="bg-white/15 p-2 rounded-xl">
-                            <FolderOpen size={20} />
-                          </div>
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.3em] text-white/60">Hướng dẫn</p>
-                            <h3 className="text-base font-semibold">Thư mục lưu kết quả</h3>
-                          </div>
-                        </div>
-                        <p className="text-sm text-white/80 mb-3 flex-1">
-                          {directoryInfo
-                            ? `Hệ thống đã ghi nhớ thư mục "${directoryInfo.name}". Mở File Explorer và truy cập thư mục này để theo dõi file vừa tách.`
-                            : 'Ngay khi chọn thư mục lưu, ứng dụng sẽ ghi nhớ và hiển thị hướng dẫn cụ thể tại đây.'}
-                        </p>
-                        <ul className="text-xs md:text-sm text-white/80 space-y-1.5 list-disc pl-5">
-                          <li>Tìm thư mục vừa chọn trong phần Quick Access.</li>
-                          <li>File được gom vào thư mục con trùng tên từ khóa.</li>
-                          <li>Giữ tab mở để hệ thống tiếp tục ghi file.</li>
-                        </ul>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-white shadow-md border border-slate-100">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-slate-100 p-2 rounded-xl">
-                              <ShieldCheck size={20} className="text-slate-500" />
-                            </div>
-                            <div>
-                              <p className="text-[11px] uppercase tracking-[0.3em] text-slate-400">Quyền truy cập</p>
-                              <h3 className="text-base font-semibold text-slate-900">Chỉnh sửa thư mục</h3>
-                            </div>
-                          </div>
-                          <span className={`text-[11px] font-semibold px-3 py-1 rounded-full ${permissionBadgeClass}`}>
-                            {permissionBadgeLabel}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-600 mb-4">
-                          {permissionHelperText}
-                        </p>
-                        <button
-                          onClick={handleRequestEditPermission}
-                          disabled={!dirHandleRef.current}
-                          className={`w-full px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${dirHandleRef.current
-                            ? 'bg-slate-900 text-white hover:bg-slate-800'
-                            : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                            }`}
-                        >
-                          Cấp quyền chỉnh sửa thư mục
-                        </button>
-                        {directoryInfo?.permission === 'denied' && (
-                          <p className="text-xs text-rose-500 mt-3">
-                            Trình duyệt đã từ chối quyền. Nhấn lại nút trên và chấp nhận pop-up để tiếp tục lưu file tự động.
-                          </p>
-                        )}
-                        {directoryInfo?.permission === 'granted' && (
-                          <p className="text-xs text-emerald-600 mt-3">
-                            Bạn có thể truy cập thư mục "{directoryInfo.name}" bất cứ lúc nào để kiểm tra tiến độ tách file.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
+                  
                   {docType === 'SPLIT' && (
                     <div className="lg:col-span-2 bg-white/80 border border-slate-100 rounded-2xl shadow-md p-3 md:p-4">
                       <JobQueueViewer onReset={handleReset} />
