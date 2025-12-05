@@ -164,12 +164,16 @@ export interface BanTinNguonKeywords {
 
 export interface PageAnalysis {
   page: number;
-  code: string | null;           // QT.MSI-BM.01, TTNH-04H00, etc.
+  code: string | null;           // QT.MSI-BM.01, TTNH-04H00, etc. (deprecated, dùng formCode)
+  formCode?: string | null;      // Mã số biểu mẫu ở khung góc (QT.MSI-BM.01, KTKS.MSI.TC-BM.01, etc.)
+  isNewFormStart?: boolean;      // Trang này là TRANG ĐẦU của biểu mẫu mới (có khung Mã số, tiêu đề lớn)
   hasPersonName: boolean;         // Có tên người không (điểm cắt)
   personName?: string;            // Tên người nếu có
+  personRole?: string | null;     // Chức danh người ký (để debug)
   isLogPage: boolean;             // Trang LOG (log ảnh, log mail, không phải nội dung chính)
   isBanTinNguonHeader?: boolean;  // Trang có header "Cộng hòa xã hội chủ nghĩa Việt Nam" của BẢN TIN NGUỒN
-  hasGmail?: boolean;             // Trang có chứa địa chỉ email dạng @gmail (LOGMAIL)
+  hasEmail?: boolean;             // Trang có chứa địa chỉ email (LOGMAIL: From/To/Subject...)
+  serviceHint?: 'NTX' | 'RTP' | 'EGC' | null; // Nếu trang cho thấy mã dịch vụ cụ thể
 }
 
 export interface PDFAnalysisResult {
@@ -198,9 +202,11 @@ export interface SplitResultData {
   originalFileName: string;
   documents: SplitDocument[];
   zipBlob: Blob | null; // Deprecated - files are now saved directly to local filesystem
-  folderStructure?: any; // JSON structure of folders
+  folderStructure?: any; // Deprecated: maintained for backward compat
   filesToSave?: FileToSave[]; // Files to save (directory picker must be called in user gesture)
-  folderStructureJson?: string; // JSON structure as string
+  folderStructureJson?: string; // Deprecated
+  extractionFolderPath?: string | null; // Where TEMP_EXTRACT was written
+  extractionSummary?: any; // JSON metadata used for routing
 }
 
 export type DocumentData = InvoiceData | IncidentReportData | SplitResultData;

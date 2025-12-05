@@ -71,6 +71,10 @@ const createPdfFromPageImage = async (base64: string): Promise<Uint8Array> => {
   return pdfDoc.save();
 };
 
+const textToUint8Array = (text: string): Uint8Array => {
+  return new TextEncoder().encode(text);
+};
+
 export const splitPdfByKeywords = async (
   file: File,
   rootDirHandle: FileSystemDirectoryHandle,
@@ -97,18 +101,35 @@ export const splitPdfByKeywords = async (
 
     const base64Images = await convertPdfToImage(file, -1);
 
+    const tempFolderBase = `TEMP_EXTRACT/${inputFileBaseName}`;
+    const tempDocsPath = `${tempFolderBase}/PDFS`;
+    const tempLogsPath = `${tempFolderBase}/LOGS`;
+
     // OPTIMIZED: Single API call for all detection
     console.log(`[PDF Splitter] Analyzing ${base64Images.length} pages with single API call...`);
     const analysis = await analyzePDFComplete(base64Images);
 
     const detectedBroadcastCode = analysis.broadcastCode;
-    const detectedServiceCode = analysis.serviceCode;
+    let detectedServiceCode = analysis.serviceCode;
 
     // Extract data from analysis
-    const pageCodes = analysis.pages.map(p => ({ page: p.page, code: p.code }));
+    // Ưu tiên formCode (từ khung Mã số) nếu có, fallback về code cũ
+    const pageCodes = analysis.pages.map(p => ({ 
+      page: p.page, 
+      code: p.formCode || p.code || null 
+    }));
+    
+    // Các trang có tên người (chữ ký, soát tin...) là điểm cắt tài liệu
     const signaturePages = analysis.pages
       .filter(p => p.hasPersonName)
-      .map(p => p.page);
+      .map(p => p.page)
+      .sort((a, b) => a - b);
+    
+    // Các trang bắt đầu biểu mẫu mới (QUAN TRỌNG: cắt ngay khi thấy)
+    const newFormStartPages = analysis.pages
+      .filter(p => p.isNewFormStart === true)
+      .map(p => p.page)
+      .sort((a, b) => a - b);
     const logPages = analysis.pages
       .filter(p => p.isLogPage)
       .map(p => p.page);
@@ -117,21 +138,54 @@ export const splitPdfByKeywords = async (
         .filter(p => p.isBanTinNguonHeader)
         .map(p => p.page)
     );
-    const gmailLogPages = new Set(
+    const emailLogPages = new Set(
       analysis.pages
-        .filter(p => p.isLogPage && p.hasGmail)
+        .filter(p => p.isLogPage && p.hasEmail)
         .map(p => p.page)
     );
+    const pageServiceHints = analysis.pages
+      .map(p => p.serviceHint)
+      .filter((hint): hint is 'NTX' | 'RTP' | 'EGC' => !!hint);
+    if (pageServiceHints.length > 0) {
+      const counts = pageServiceHints.reduce<Record<string, number>>((acc, hint) => {
+        acc[hint] = (acc[hint] || 0) + 1;
+        return acc;
+      }, {});
+      const sortedHints = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (sortedHints.length > 0) {
+        const majorityHint = sortedHints[0][0] as 'NTX' | 'RTP' | 'EGC';
+        if (detectedServiceCode !== majorityHint) {
+          console.log(`[PDF Splitter] Service code set to ${majorityHint} (was ${detectedServiceCode || 'null'}) using page hints`);
+        }
+        detectedServiceCode = majorityHint;
+      }
+    }
+
+    if (!detectedServiceCode) {
+      throw new Error('Không xác định được Mã dịch vụ (NTX/RTP/EGC) từ tài liệu. Vui lòng kiểm tra lại.');
+    }
 
     console.log(`[PDF Splitter] Analysis complete:`);
     console.log(`  - Broadcast: ${detectedBroadcastCode}, Service: ${detectedServiceCode}`);
-    console.log(`  - Signature pages: ${signaturePages.join(', ') || 'NONE'}`);
     console.log(`  - LOG pages: ${logPages.join(', ') || 'NONE'}`);
 
-
-    // Split documents based on signature pages
+    // LOGIC CẮT ĐƠN GIẢN: Chỉ cắt khi có MÃ SỐ (formCode) + CHỮ KÝ (hasPersonName) ở cùng trang
     const documents: SplitDocument[] = [];
-    let currentDocStartPage = 1;
+    const documentMetadata: Array<{
+      id: string;
+      filename: string;
+      code: string | null;
+      startPage: number;
+      endPage: number;
+      pageCount: number;
+      recommendedPath: string | null;
+    }> = [];
+    const logMetadata: Array<{
+      filename: string;
+      page: number;
+      sourceDocumentId: string;
+      recommendedPath: string | null;
+    }> = [];
 
     // Helper: Find first code in page range
     const findCodeInRange = (startPage: number, endPage: number): string | null => {
@@ -141,106 +195,217 @@ export const splitPdfByKeywords = async (
       return codesInRange.length > 0 ? codesInRange[0].code : null;
     };
 
-    // Create documents based on signature pages
-    for (const signaturePage of signaturePages) {
-      // Find code in this document range
-      const docCode = findCodeInRange(currentDocStartPage, signaturePage);
+    // LOGIC CẮT MỚI:
+    // 1. BAN TIN NGUON: Bắt đầu = isBanTinNguonHeader, Kết thúc = hasPersonName (có thể nhiều trang)
+    // 2. Biểu mẫu QT/KTKS: Bắt đầu = formCode ở trang đầu, Kết thúc = hasPersonName ở trang cuối (có thể nhiều trang)
+    // 3. LOG: Tách riêng vào PDFS
+    
+    let currentDocStartPage: number | null = null;
+    let currentDocType: 'BAN_TIN_NGUON' | 'BIEU_MAU' | null = null;
+    let currentDocFormCode: string | null = null;
+    
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const pageInfo = analysis.pages.find(p => p.page === pageNum);
+      if (!pageInfo) continue;
+      
+      // Bỏ qua trang LOG - sẽ xử lý riêng sau
+      if (pageInfo.isLogPage) {
+        // Nếu đang có document đang xây dựng → lưu document đó trước
+        if (currentDocStartPage !== null && currentDocType !== null) {
+          // Tìm chữ ký ở trang trước đó
+          let lastSignaturePage = pageNum - 1;
+          while (lastSignaturePage >= currentDocStartPage) {
+            const prevPageInfo = analysis.pages.find(p => p.page === lastSignaturePage);
+            if (prevPageInfo && prevPageInfo.hasPersonName) {
+              // Lưu document
+              const docCode = currentDocType === 'BAN_TIN_NGUON' 
+                ? findCodeInRange(currentDocStartPage, lastSignaturePage) || 'BAN_TIN_NGUON'
+                : currentDocFormCode || findCodeInRange(currentDocStartPage, lastSignaturePage);
+              
+              if (docCode) {
+                let sanitizedCode = docCode.trim();
+                if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
+                sanitizedCode = sanitizeFilePart(sanitizedCode);
+                const docName = currentDocType === 'BAN_TIN_NGUON'
+                  ? inputFileBaseName
+                  : `${inputFileBaseName} - ${sanitizedCode}`;
 
-      // Generate filename
-      let docName: string;
-      if (docCode) {
-        let sanitizedCode = docCode.trim();
-        if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
-        sanitizedCode = sanitizeFilePart(sanitizedCode);
-        docName = `${inputFileBaseName} - ${sanitizedCode}`;
-      } else {
-        docName = `${inputFileBaseName} - Document_${documents.length + 1}`;
-      }
-
-      documents.push({
-        id: Math.random().toString(36).substr(2, 9),
-        filename: `${docName}.pdf`,
-        code: docCode || undefined,
-        startPage: currentDocStartPage,
-        endPage: signaturePage,
-        pageCount: signaturePage - currentDocStartPage + 1
-      });
-
-      // Check pages after signature for LOG content
-      // LOG pages should be extracted separately, not become new documents
-      let nextPage = signaturePage + 1;
-      while (nextPage <= numPages) {
-        const pageImage = base64Images[nextPage - 1];
-        if (!pageImage) break;
-
-        try {
-          const isLog = false; // OLD: await detectLogPage(pageImage) - now using logPages from analysis
-          if (isLog) {
-            // This is a LOG page, skip it (will be extracted later in the LOG extraction phase)
-            nextPage++;
-          } else {
-            // Not a LOG page, this is the start of the next document
-            break;
+                documents.push({
+                  id: Math.random().toString(36).substr(2, 9),
+                  filename: `${docName}.pdf`,
+                  code: currentDocType === 'BAN_TIN_NGUON' ? undefined : docCode,
+                  startPage: currentDocStartPage,
+                  endPage: lastSignaturePage,
+                  pageCount: lastSignaturePage - currentDocStartPage + 1
+                });
+              }
+              break;
+            }
+            lastSignaturePage--;
           }
-        } catch (error) {
-          // If detection fails, assume it's not a LOG page and break
+        }
+        currentDocStartPage = null;
+        currentDocType = null;
+        currentDocFormCode = null;
+        continue; // Bỏ qua trang LOG
+      }
+      
+      // QUAN TRỌNG: BAN TIN NGUON không bao giờ có formCode
+      // Bắt đầu BAN TIN NGUON: có header "CỘNG HÒA..." VÀ không có formCode VÀ chưa có document nào đang xây dựng
+      if (pageInfo.isBanTinNguonHeader && !pageInfo.formCode && currentDocStartPage === null) {
+        // Bắt đầu BAN TIN NGUON mới
+        currentDocStartPage = pageNum;
+        currentDocType = 'BAN_TIN_NGUON';
+        currentDocFormCode = null;
+      }
+      // Bắt đầu Biểu mẫu: có formCode (mã số ở khung góc)
+      // QUAN TRỌNG: Nếu có formCode thì KHÔNG PHẢI là BAN TIN NGUON
+      else if (pageInfo.formCode) {
+        // Nếu đang có document đang xây dựng → lưu document đó trước
+        if (currentDocStartPage !== null && currentDocType !== null) {
+          // Tìm chữ ký ở trang trước đó
+          let lastSignaturePage = pageNum - 1;
+          while (lastSignaturePage >= currentDocStartPage) {
+            const prevPageInfo = analysis.pages.find(p => p.page === lastSignaturePage);
+            if (prevPageInfo && !prevPageInfo.isLogPage && prevPageInfo.hasPersonName) {
+              // Lưu document
+              const docCode = currentDocType === 'BAN_TIN_NGUON' 
+                ? findCodeInRange(currentDocStartPage, lastSignaturePage) || 'BAN_TIN_NGUON'
+                : currentDocFormCode || findCodeInRange(currentDocStartPage, lastSignaturePage);
+              
+              if (docCode) {
+                let sanitizedCode = docCode.trim();
+                if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
+                sanitizedCode = sanitizeFilePart(sanitizedCode);
+                const docName = currentDocType === 'BAN_TIN_NGUON'
+                  ? inputFileBaseName
+                  : `${inputFileBaseName} - ${sanitizedCode}`;
+
+                documents.push({
+                  id: Math.random().toString(36).substr(2, 9),
+                  filename: `${docName}.pdf`,
+                  code: currentDocType === 'BAN_TIN_NGUON' ? undefined : docCode,
+                  startPage: currentDocStartPage,
+                  endPage: lastSignaturePage,
+                  pageCount: lastSignaturePage - currentDocStartPage + 1
+                });
+              }
+              break;
+            }
+            lastSignaturePage--;
+          }
+        }
+        // Bắt đầu biểu mẫu mới
+        currentDocStartPage = pageNum;
+        currentDocType = 'BIEU_MAU';
+        currentDocFormCode = pageInfo.formCode;
+      }
+      // Kết thúc document: có tên người ở cuối trang VÀ trang tiếp theo có formCode mới
+      // QUAN TRỌNG: Chỉ kết thúc khi tên người ở cuối trang (hasPersonName = true) VÀ trang tiếp theo có formCode mới
+      // Nếu trang tiếp theo không có formCode mới → tiếp tục document (có thể có nhiều trang)
+      else if (pageInfo.hasPersonName && currentDocStartPage !== null && currentDocType !== null) {
+        // Kiểm tra trang tiếp theo: CHỈ kết thúc nếu có formCode mới (khác với formCode hiện tại)
+        const nextPageNum = pageNum + 1;
+        const nextPageInfo = analysis.pages.find(p => p.page === nextPageNum);
+        
+        // Chỉ kết thúc document nếu:
+        // 1. Trang tiếp theo có formCode mới (khác với formCode hiện tại) VÀ không phải LOG
+        // 2. Hoặc đây là trang cuối cùng
+        // 3. Hoặc trang tiếp theo có isBanTinNguonHeader (bắt đầu BAN TIN NGUON mới) VÀ document hiện tại không phải BAN TIN NGUON
+        const shouldEndDocument = 
+          (nextPageInfo && nextPageInfo.formCode && nextPageInfo.formCode !== currentDocFormCode && !nextPageInfo.isLogPage) ||
+          (pageNum === numPages) ||
+          (nextPageInfo && nextPageInfo.isBanTinNguonHeader && !nextPageInfo.formCode && currentDocType !== 'BAN_TIN_NGUON');
+        
+        if (shouldEndDocument) {
+          // Lưu document hiện tại
+          const docCode = currentDocType === 'BAN_TIN_NGUON'
+            ? findCodeInRange(currentDocStartPage, pageNum) || 'BAN_TIN_NGUON'
+            : currentDocFormCode || findCodeInRange(currentDocStartPage, pageNum);
+          
+          if (docCode) {
+            let sanitizedCode = docCode.trim();
+            if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
+            sanitizedCode = sanitizeFilePart(sanitizedCode);
+            const docName = currentDocType === 'BAN_TIN_NGUON'
+              ? inputFileBaseName
+              : `${inputFileBaseName} - ${sanitizedCode}`;
+
+            documents.push({
+              id: Math.random().toString(36).substr(2, 9),
+              filename: `${docName}.pdf`,
+              code: currentDocType === 'BAN_TIN_NGUON' ? undefined : docCode,
+              startPage: currentDocStartPage,
+              endPage: pageNum,
+              pageCount: pageNum - currentDocStartPage + 1
+            });
+          }
+          
+          // Reset để bắt đầu document mới
+          currentDocStartPage = null;
+          currentDocType = null;
+          currentDocFormCode = null;
+        }
+        // Nếu không, tiếp tục document hiện tại (không làm gì, chỉ tiếp tục vòng lặp)
+        // Điều này cho phép document có nhiều trang
+      }
+    }
+
+    // Handle remaining pages (nếu còn document chưa kết thúc)
+    if (currentDocStartPage !== null && currentDocType !== null) {
+      // Tìm chữ ký ở trang cuối
+      let lastSignaturePage = numPages;
+      while (lastSignaturePage >= currentDocStartPage) {
+        const pageInfo = analysis.pages.find(p => p.page === lastSignaturePage);
+        if (pageInfo && !pageInfo.isLogPage && pageInfo.hasPersonName) {
+          const docCode = currentDocType === 'BAN_TIN_NGUON'
+            ? findCodeInRange(currentDocStartPage, lastSignaturePage) || 'BAN_TIN_NGUON'
+            : currentDocFormCode || findCodeInRange(currentDocStartPage, lastSignaturePage);
+          
+          if (docCode) {
+            let sanitizedCode = docCode.trim();
+            if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
+            sanitizedCode = sanitizeFilePart(sanitizedCode);
+            const docName = currentDocType === 'BAN_TIN_NGUON'
+              ? inputFileBaseName
+              : `${inputFileBaseName} - ${sanitizedCode}`;
+
+            documents.push({
+              id: Math.random().toString(36).substr(2, 9),
+              filename: `${docName}.pdf`,
+              code: currentDocType === 'BAN_TIN_NGUON' ? undefined : docCode,
+              startPage: currentDocStartPage,
+              endPage: lastSignaturePage,
+              pageCount: lastSignaturePage - currentDocStartPage + 1
+            });
+          }
           break;
         }
+        lastSignaturePage--;
       }
-
-      // Next document starts after signature page AND any LOG pages
-      currentDocStartPage = nextPage;
     }
 
-    // Handle remaining pages after last signature (if any)
-    if (currentDocStartPage <= numPages) {
-      const docCode = findCodeInRange(currentDocStartPage, numPages);
-
-      let docName: string;
-      if (docCode) {
-        let sanitizedCode = docCode.trim();
-        if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
-        sanitizedCode = sanitizeFilePart(sanitizedCode);
-        docName = `${inputFileBaseName} - ${sanitizedCode}`;
-      } else {
-        docName = `${inputFileBaseName} - Document_${documents.length + 1}`;
-      }
-
-      documents.push({
-        id: Math.random().toString(36).substr(2, 9),
-        filename: `${docName}.pdf`,
-        code: docCode || undefined,
-        startPage: currentDocStartPage,
-        endPage: numPages,
-        pageCount: numPages - currentDocStartPage + 1
-      });
-    }
-
-    // If no signatures found, create single document with all pages
+    // If no documents created (no codes found), try to create at least one if there's any code
     if (documents.length === 0) {
       const docCode = pageCodes.find(pc => pc.code)?.code || null;
-
-      let docName: string;
       if (docCode) {
         let sanitizedCode = docCode.trim();
         if (sanitizedCode.length > 80) sanitizedCode = sanitizedCode.substring(0, 80);
         sanitizedCode = sanitizeFilePart(sanitizedCode);
-        docName = `${inputFileBaseName} - ${sanitizedCode}`;
-      } else {
-        docName = `${inputFileBaseName} - Document_1`;
-      }
+        const docName = `${inputFileBaseName} - ${sanitizedCode}`;
 
-      documents.push({
-        id: Math.random().toString(36).substr(2, 9),
-        filename: `${docName}.pdf`,
-        code: docCode || undefined,
-        startPage: 1,
-        endPage: numPages,
-        pageCount: numPages
-      });
+        documents.push({
+          id: Math.random().toString(36).substr(2, 9),
+          filename: `${docName}.pdf`,
+          code: docCode,
+          startPage: 1,
+          endPage: numPages,
+          pageCount: numPages
+        });
+      }
     }
 
-    console.log(`[PDF Splitter] Created ${documents.length} documents:`);
+    console.log(`[PDF Splitter] Created ${documents.length} documents (initial ranges before log trimming):`);
     documents.forEach((doc, idx) => {
       console.log(`  Doc ${idx + 1}: pages ${doc.startPage}-${doc.endPage}, code: "${doc.code || 'NONE'}", filename: "${doc.filename}"`);
     });
@@ -323,141 +488,86 @@ export const splitPdfByKeywords = async (
     };
 
     const getLogFolderPath = (): string | null => {
-      if (!detectedBroadcastCode) return null;
-
+      // LOG luôn cần nơi lưu; mặc định MET nếu không xác định được broadcastCode.
       const validLogCodes = ['MET', 'NAV', 'SAR', 'WX'];
-      const subFolderCode = validLogCodes.includes(detectedBroadcastCode) ? detectedBroadcastCode : 'MET';
+      const subFolderCode =
+        detectedBroadcastCode && validLogCodes.includes(detectedBroadcastCode)
+          ? detectedBroadcastCode
+          : 'MET';
 
       return `LOG FTP/${subFolderCode}`;
     };
 
-    const mightHaveLog = (code: string | undefined): boolean => {
-      if (!code) return true;
-      const codeUpper = code.toUpperCase();
-      if (codeUpper.includes('QT.MSI-BM') || codeUpper.includes('QTMSI-BM')) {
-        return false;
-      }
-      return true;
-    };
-
-    const documentIsTTNH = new Map<string, boolean>();
+    // Xác định BẢN TIN NGUỒN theo nội dung thực tế:
+    // - Ưu tiên text header "Cộng hòa xã hội chủ nghĩa Việt Nam" (isBanTinNguonHeader từ AI)
+    // - Không khoá cứng theo mã TTNH/ĐBQG vì có thể có nhiều ký hiệu khác
+    const documentIsBanTinNguon = new Map<string, boolean>();
 
     for (const doc of documents) {
       const folderPath = getFolderPath(doc.code);
-      console.log(`[PDF Splitter] Doc "${doc.filename}" → Folder: "${folderPath || 'NULL'}"`);
+      console.log(`[PDF Splitter] Doc "${doc.filename}" → Folder (by code): "${folderPath || 'NULL'}"`);
 
-      let hasTTNH = false;
-      if (doc.code) {
+      let isBanTinNguon = false;
+
+      // 1) Nếu bất kỳ trang nào trong document được AI đánh dấu isBanTinNguonHeader → coi là BẢN TIN NGUỒN
+      for (let p = doc.startPage; p <= doc.endPage; p++) {
+        if (banTinNguonHeaderPages.has(p)) {
+          isBanTinNguon = true;
+          break;
+        }
+      }
+
+      // 2) Bổ sung nhẹ: nếu không có header nhưng code là TTNH/ĐBQG/04H00 và không chứa QT/KTKS
+      //    thì vẫn coi là BẢN TIN NGUỒN (trường hợp form bị scan thiếu phần header)
+      if (!isBanTinNguon && doc.code) {
         const codeUpper = doc.code.toUpperCase();
-        // Only pure BAN TIN NGUON codes (TTNH, DBQG, 04H00) WITHOUT QT/KTKS
         const hasQTorKTKS = codeUpper.includes('QT') || codeUpper.includes('KTKS');
-        if (!hasQTorKTKS && (codeUpper.includes('TTNH') || codeUpper.includes('DBQG') || codeUpper.includes('04H00'))) {
-          hasTTNH = true;
+        if (!hasQTorKTKS && (codeUpper.includes('TTNH') || codeUpper.includes('ĐBQG') || codeUpper.includes('DBQG') || codeUpper.includes('04H00'))) {
+          isBanTinNguon = true;
         }
       }
 
-      // Bổ sung: nếu trong khoảng trang của doc có header "Cộng hòa xã hội chủ nghĩa Việt Nam"
-      // và không phải QT/KTKS thì cũng coi là BẢN TIN NGUỒN
-      if (!hasTTNH) {
-        for (let p = doc.startPage; p <= doc.endPage; p++) {
-          if (banTinNguonHeaderPages.has(p)) {
-            hasTTNH = true;
-            break;
-          }
-        }
-      }
-
-      documentIsTTNH.set(doc.id, hasTTNH);
-      console.log(`[PDF Splitter] Doc "${doc.filename}" → Is pure BAN TIN NGUON: ${hasTTNH}`);
+      documentIsBanTinNguon.set(doc.id, isBanTinNguon);
+      console.log(`[PDF Splitter] Doc "${doc.filename}" → Is BAN TIN NGUON (by content): ${isBanTinNguon}`);
     }
 
-    for (const doc of documents) {
+    // Gán trang LOG cho từng BẢN TIN NGUỒN dựa trên vị trí:
+    // - LOG = các trang ngay sau BẢN TIN NGUỒN, trước (và bao gồm) trang mở đầu của tài liệu kế tiếp.
+    // - Ví dụ: BTN ở trang 3, tài liệu tiếp theo bắt đầu trang 4, nếu trang 4 là LOG → log của BTN.
+    const logPagesByDocId = new Map<string, number[]>();
+    const assignedLogPages = new Set<number>();
+
+    for (let docIndex = 0; docIndex < documents.length; docIndex++) {
+      const doc = documents[docIndex];
+      const isBanTinNguon = documentIsBanTinNguon.get(doc.id) || false;
+      if (!isBanTinNguon) continue;
+
+      const nextDocStart =
+        docIndex < documents.length - 1 ? documents[docIndex + 1].startPage : numPages + 1;
+
+      for (let p = doc.endPage + 1; p < nextDocStart && p <= numPages; p++) {
+        if (logPages.includes(p) || emailLogPages.has(p)) {
+          assignedLogPages.add(p);
+          const arr = logPagesByDocId.get(doc.id) || [];
+          arr.push(p);
+          logPagesByDocId.set(doc.id, arr);
+        }
+      }
+    }
+
+    for (let docIndex = 0; docIndex < documents.length; docIndex++) {
+      const doc = documents[docIndex];
       if (doc.startPage > doc.endPage || doc.startPage < 1 || doc.endPage > numPages) {
         continue;
       }
 
-      const shouldCheckLog = mightHaveLog(doc.code);
       const pagesToInclude: number[] = [];
-      const logPagesInDoc: number[] = [];
+      const logPagesInDoc: number[] = logPagesByDocId.get(doc.id) || [];
 
-      // Nếu toàn bộ các trang của tài liệu này đều là LOG (theo AI),
-      // coi đây là tài liệu LOG thuần, không lưu như document chính.
-      if (shouldCheckLog) {
-        let allPagesAreLog = true;
-        for (let j = doc.startPage; j <= doc.endPage; j++) {
-          if (!logPages.includes(j)) {
-            allPagesAreLog = false;
-            break;
-          }
-        }
-        if (allPagesAreLog) {
-          for (let j = doc.startPage; j <= doc.endPage; j++) {
-            logPagesInDoc.push(j);
-          }
-        }
-      }
-
-      if (shouldCheckLog && doc.pageCount > 1 && logPagesInDoc.length === 0) {
-        const pagesToCheck = doc.pageCount <= 3 ? [doc.endPage] : [doc.endPage - 1, doc.endPage];
-
-        for (let j = doc.startPage; j <= doc.endPage; j++) {
-          const pageIndex = j - 1;
-          const imageBase64 = base64Images[pageIndex];
-
-          if (!imageBase64) {
-            pagesToInclude.push(j);
-            continue;
-          }
-
-          if (pagesToCheck.includes(j)) {
-            try {
-              const image = await loadImageFromBase64(imageBase64);
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              if (!ctx) {
-                pagesToInclude.push(j);
-                continue;
-              }
-
-              canvas.width = image.width;
-              canvas.height = image.height;
-              ctx.drawImage(image, 0, 0);
-
-              const imageData = ctx.getImageData(0, 0, image.width, image.height);
-              const { data } = imageData;
-              let nonWhitePixels = 0;
-              const totalPixels = image.width * image.height;
-
-              for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-                if (luminance < 240) {
-                  nonWhitePixels++;
-                }
-              }
-
-              const contentRatio = nonWhitePixels / totalPixels;
-              if (contentRatio > 0.1) {
-                const isLogPage = logPages.includes(j); // Use logPages from analysis instead of API call
-                if (isLogPage) {
-                  logPagesInDoc.push(j);
-                  continue;
-                }
-              }
-              pagesToInclude.push(j);
-            } catch (error) {
-              pagesToInclude.push(j);
-            }
-          } else {
-            pagesToInclude.push(j);
-          }
-        }
-      } else {
-        for (let j = doc.startPage; j <= doc.endPage; j++) {
-          pagesToInclude.push(j);
-        }
+      // Trang nội dung chính của tài liệu (bỏ qua những trang đã gán là LOG cho BẢN TIN NGUỒN)
+      for (let j = doc.startPage; j <= doc.endPage; j++) {
+        if (assignedLogPages.has(j)) continue;
+        pagesToInclude.push(j);
       }
 
       if (pagesToInclude.length > 0) {
@@ -469,11 +579,11 @@ export const splitPdfByKeywords = async (
 
         const pdfBytes = await subDoc.save();
 
-        const isTTNH = documentIsTTNH.get(doc.id) || false;
+        const isBanTinNguon = documentIsBanTinNguon.get(doc.id) || false;
         let folderPath: string | null = null;
         let outputFileName = doc.filename;
 
-        if (isTTNH) {
+        if (isBanTinNguon) {
           const broadcastCode = detectedBroadcastCode || 'MET';
           folderPath = `BAN TIN NGUON/${broadcastCode}`;
           // Riêng BẢN TIN NGUỒN: đặt tên file theo tên file gốc, không thêm mã code phía sau
@@ -482,251 +592,85 @@ export const splitPdfByKeywords = async (
           folderPath = doc.code ? getFolderPath(doc.code) : null;
         }
 
-        if (folderPath) {
-          filesToSave.push({
-            path: folderPath,
-            filename: outputFileName,
-            bytes: pdfBytes
-          });
-        }
+        documentMetadata.push({
+          id: doc.id,
+          filename: outputFileName,
+          code: doc.code || null,
+          startPage: doc.startPage,
+          endPage: doc.endPage,
+          pageCount: doc.pageCount,
+          recommendedPath: folderPath
+        });
+
+        filesToSave.push({
+          path: tempDocsPath,
+          filename: outputFileName,
+          bytes: pdfBytes
+        });
       }
 
-      if (logPagesInDoc.length > 0) {
-        let logCounter = 1;
-        const logFolderPath = getLogFolderPath();
+      // LOG: Tách riêng vào PDFS (không gắn với document)
+      // Xử lý sau khi đã tạo tất cả documents
+    }
 
-        if (!logFolderPath) {
-          continue;
-        }
+    // Xử lý LOG riêng: Tách tất cả trang LOG vào PDFS
+    const allLogPages = analysis.pages
+      .filter(p => p.isLogPage)
+      .map(p => p.page)
+      .sort((a, b) => a - b);
+    
+    for (const pageNum of allLogPages) {
+      try {
+        const logDoc = await PDFDocument.create();
+        const pageIndex = pageNum - 1;
+        const [copiedPage] = await logDoc.copyPages(sourcePdfDoc, [pageIndex]);
+        logDoc.addPage(copiedPage);
+        const logPdfBytes = await logDoc.save();
 
-        for (const pageNum of logPagesInDoc) {
-          try {
-            const logDoc = await PDFDocument.create();
-            const pageIndex = pageNum - 1;
-            const [copiedPage] = await logDoc.copyPages(sourcePdfDoc, [pageIndex]);
-            logDoc.addPage(copiedPage);
-            const logPdfBytes = await logDoc.save();
+        const logBaseName = sanitizeFilePart(`${inputFileBaseName}`);
+        const isEmailLog = emailLogPages.has(pageNum);
+        const suffix = isEmailLog ? '_LOGMAIL' : '_LOG';
+        const filename = `${logBaseName}${suffix}.pdf`;
 
-            const docCode = doc.code || 'Document';
-            const logBaseName = sanitizeFilePart(`${inputFileBaseName}-${docCode}`);
-            const isGmailLog = gmailLogPages.has(pageNum);
-            const suffix = isGmailLog ? '_LOGMAIL' : '_LOG';
-            const filename = logCounter === 1
-              ? `${logBaseName}${suffix}.pdf`
-              : `${logCounter}${logBaseName}${suffix}.pdf`;
+        logMetadata.push({
+          filename: filename,
+          page: pageNum,
+          sourceDocumentId: '',
+          recommendedPath: tempDocsPath // Lưu vào PDFS
+        });
 
-            filesToSave.push({
-              path: logFolderPath,
-              filename: filename,
-              bytes: logPdfBytes
-            });
-            logCounter++;
-          } catch (error) {
-            // Silent fail for log extraction
-          }
-        }
+        filesToSave.push({
+          path: tempDocsPath, // Lưu vào PDFS
+          filename: filename,
+          bytes: logPdfBytes
+        });
+      } catch (error) {
+        console.error(`[PDF Splitter] Error creating LOG PDF for page ${pageNum}:`, error);
       }
     }
 
-    const folderStructureSet = new Set<string>();
-    const ensureSubfolders = (parentPath: string, subfolders: string[]) => {
-      subfolders.forEach(subfolder => {
-        const fullPath = parentPath ? `${parentPath}/${subfolder}` : subfolder;
-        folderStructureSet.add(fullPath);
-      });
+    const extractionSummary = {
+      originalFileName: file.name,
+      broadcastCode: detectedBroadcastCode,
+      serviceCode: detectedServiceCode,
+      generatedAt: new Date().toISOString(),
+      documents: documentMetadata,
+      logs: logMetadata,
+      analysis: analysis
     };
 
-    const addFolderToStructure = (structure: any, path: string, rootFolder: any) => {
-      const parts = path.split('/');
-      let current = rootFolder;
+    // In JSON để debug
+    console.log('[PDF Splitter] Extraction Summary JSON:');
+    console.log(JSON.stringify(extractionSummary, null, 2));
 
-      parts.forEach((part) => {
-        let child = current.children?.find((c: any) => c.name === part);
-        if (!child) {
-          child = {
-            name: part,
-            type: "folder",
-            children: []
-          };
-          if (!current.children) {
-            current.children = [];
-          }
-          current.children.push(child);
-        }
-        current = child;
-      });
+    filesToSave.push({
+      path: tempFolderBase,
+      filename: 'extraction-summary.json',
+      bytes: textToUint8Array(JSON.stringify(extractionSummary, null, 2))
+    });
 
-      return current;
-    };
-
-    const generateFolderStructure = (): any => {
-      const structure: any = {
-        name: "DNR",
-        type: "folder",
-        children: [
-          {
-            name: "PHAT MSI & SAR THANG 11-2025",
-            type: "folder",
-            children: []
-          }
-        ]
-      };
-
-      const rootFolder = structure.children[0];
-
-      const parentFolderPaths = new Set<string>();
-
-      for (const doc of documents) {
-        const isTTNH = documentIsTTNH.get(doc.id) || false;
-        let folderPath: string | null = null;
-        if (isTTNH) {
-          const broadcastCode = detectedBroadcastCode || 'MET';
-          folderPath = `BAN TIN NGUON/${broadcastCode}`;
-        } else {
-          folderPath = doc.code ? getFolderPath(doc.code) : null;
-        }
-        if (folderPath) {
-          const parts = folderPath.split('/');
-          if (parts.length > 0) {
-            parts.pop();
-            parentFolderPaths.add(parts.join('/'));
-          }
-        }
-      }
-
-      const logPath = getLogFolderPath();
-      if (logPath) {
-        const parts = logPath.split('/');
-        if (parts.length > 0) {
-          parts.pop();
-          parentFolderPaths.add(parts.join('/'));
-        }
-      }
-
-      parentFolderPaths.forEach(parentPath => {
-        const current = addFolderToStructure(structure, parentPath, rootFolder);
-
-        const isLogFTP = parentPath.includes('LOG FTP');
-        const subfolders = isLogFTP
-          ? ['MET', 'NAV', 'SAR', 'WX']
-          : ['MET', 'NAV', 'SAR', 'WX', 'TUYEN'];
-
-        subfolders.forEach(subfolder => {
-          const existing = current.children?.find((c: any) => c.name === subfolder);
-          if (!existing) {
-            if (!current.children) {
-              current.children = [];
-            }
-            current.children.push({
-              name: subfolder,
-              type: "folder",
-              children: []
-            });
-          }
-        });
-
-        ensureSubfolders(parentPath, subfolders);
-      });
-
-      const egcFolders = [
-        'DICH VU EGC/BAN TIN NGUON DA DUOC XU LY EGC',
-        'DICH VU EGC/KTKS TAI CHO BAN TIN NGUON XU LY EGC'
-      ];
-
-      egcFolders.forEach(egcPath => {
-        const current = addFolderToStructure(structure, egcPath, rootFolder);
-
-        ['MET', 'NAV', 'SAR', 'WX', 'TUYEN'].forEach(subfolder => {
-          const existing = current.children?.find((c: any) => c.name === subfolder);
-          if (!existing) {
-            if (!current.children) {
-              current.children = [];
-            }
-            current.children.push({
-              name: subfolder,
-              type: "folder",
-              children: []
-            });
-          }
-        });
-
-        ensureSubfolders(egcPath, ['MET', 'NAV', 'SAR', 'WX', 'TUYEN']);
-      });
-
-      const coverFolders = [
-        {
-          path: 'COVER/COVER',
-          subfolders: ['MET', 'NAV', 'SAR', 'TUYEN', 'WX']
-        },
-        {
-          path: 'COVER/KTKSTC BM 01',
-          subfolders: ['MET', 'NAV', 'SAR', 'WX']
-        }
-      ];
-
-      coverFolders.forEach(coverFolder => {
-        const current = addFolderToStructure(structure, coverFolder.path, rootFolder);
-
-        coverFolder.subfolders.forEach(subfolder => {
-          const existing = current.children?.find((c: any) => c.name === subfolder);
-          if (!existing) {
-            if (!current.children) {
-              current.children = [];
-            }
-            current.children.push({
-              name: subfolder,
-              type: "folder",
-              children: []
-            });
-          }
-        });
-
-        ensureSubfolders(coverFolder.path, coverFolder.subfolders);
-      });
-
-      const banTinNguonPath = 'BAN TIN NGUON';
-      const banTinNguonCurrent = addFolderToStructure(structure, banTinNguonPath, rootFolder);
-
-      ['MET', 'NAV', 'SAR', 'WX', 'TUYEN'].forEach(subfolder => {
-        const existing = banTinNguonCurrent.children?.find((c: any) => c.name === subfolder);
-        if (!existing) {
-          if (!banTinNguonCurrent.children) {
-            banTinNguonCurrent.children = [];
-          }
-          banTinNguonCurrent.children.push({
-            name: subfolder,
-            type: "folder",
-            children: []
-          });
-        }
-      });
-
-      ensureSubfolders(banTinNguonPath, ['MET', 'NAV', 'SAR', 'WX', 'TUYEN']);
-
-      const logFtpPath = 'LOG FTP';
-      const logFtpCurrent = addFolderToStructure(structure, logFtpPath, rootFolder);
-
-      ['MET', 'NAV', 'SAR', 'WX'].forEach(subfolder => {
-        const existing = logFtpCurrent.children?.find((c: any) => c.name === subfolder);
-        if (!existing) {
-          if (!logFtpCurrent.children) {
-            logFtpCurrent.children = [];
-          }
-          logFtpCurrent.children.push({
-            name: subfolder,
-            type: "folder",
-            children: []
-          });
-        }
-      });
-
-      ensureSubfolders(logFtpPath, ['MET', 'NAV', 'SAR', 'WX']);
-
-      return structure;
-    };
-
-    const folderStructure = generateFolderStructure();
-    const structureJson = JSON.stringify(folderStructure, null, 2);
+    const folderStructure = null;
+    const structureJson = null;
 
     if (filesToSave.length > 0) {
       if (!rootDirHandle) {
@@ -742,7 +686,9 @@ export const splitPdfByKeywords = async (
       zipBlob: null,
       folderStructure: folderStructure,
       filesToSave: filesToSave,
-      folderStructureJson: structureJson
+      folderStructureJson: structureJson,
+      extractionFolderPath: tempFolderBase,
+      extractionSummary
     };
 
   } catch (error) {

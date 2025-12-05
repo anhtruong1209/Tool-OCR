@@ -820,74 +820,71 @@ export const analyzePDFComplete = async (
 
     console.log(`[Gemini Service] Analyzing batch: pages ${startPageNum}-${startPageNum + batchImages.length - 1} (${batchImages.length} pages)`);
 
-    const prompt = `Bạn là trợ lý AI phân tích PDF chuyên nghiệp.
+    const prompt = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ cốt lõi: Xác định chính xác ĐIỂM BẮT ĐẦU và KẾT THÚC của từng biểu mẫu để chia tách file.
 
-NHIỆM VỤ: Phân tích TẤT CẢ các trang và trả về JSON với đầy đủ thông tin.
+HÃY PHÂN TÍCH TỪNG TRANG THEO 4 QUY TẮC SAU:
 
-1. **BROADCAST CODE** (Mã phát sóng):
-   Tìm trong "Mã bản tin đài xử lý" hoặc header
-   Các giá trị: MET, NAV, SAR, WX, TUYEN
+1. **PHÁT HIỆN MÃ SỐ (formCode - QUAN TRỌNG NHẤT)**
+   - formCode: CHỈ lấy từ khung "Mã số" hoặc "Code" ở góc trên (trái hoặc phải) của trang.
+   - Khung này thường là một bảng nhỏ, có tiêu đề "Mã số:" hoặc "Code:" và giá trị như "QT.MSI-BM.03", "KTKS.MSI.TC-BM.01", "TTNH-04H00", "ĐBQG".
+   - TUYỆT ĐỐI KHÔNG lấy mã số từ:
+     + Nội dung văn bản (ví dụ: "Mã bản tin nguồn: 3944/2025/VIS-TTNH")
+     + Header/footer
+     + Bất kỳ nơi nào khác ngoài khung "Mã số" ở góc
+   - Nếu KHÔNG có khung "Mã số" ở góc → formCode = null (kể cả khi có mã số ở nơi khác).
+   - Trang LOG (isLogPage = true) → formCode = null (không bao giờ có mã số).
    
-2. **SERVICE CODE** (Mã dịch vụ):
-   Tìm trong "Mã bản tin đài xử lý" hoặc header
-   Các giá trị: NTX, RTP, EGC
+   - isNewFormStart: true nếu trang có khung "Mã số" ở góc VÀ có tiêu đề lớn in hoa (QUY TRÌNH, PHIẾU KIỂM TRA, BẢN TIN...).
 
-3. **MỖI TRANG** - Phân tích và trả về:
-   a) **Mã số (code)**: 
-      - QT.MSI-BM.01, QT.MSI-BM.02, QT.MSI-BM.03, QT.MSI-BM.04
-      - KTKS.MSI.TC-BM.01, KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03
-      - TTNH-04H00/ĐBQG, TTNH-04H00, ĐBQG
-      - Hoặc bất kỳ mã nào có pattern: chữ + số + dấu
-      - Nếu KHÔNG tìm thấy mã → trả về null
-   
-   b) **Có tên người không (hasPersonName)**:
-      - Tìm tên người Việt Nam (2-4 từ, chữ cái đầu viết hoa)
-      - Ví dụ: "Vũ Anh Tuấn", "Trần Như Quỳnh", "Nguyễn Xuân Hiến", "Phạm Thị Châm"
-      - Tìm trong: "Soát tin:", "Dự báo viên:", "KT. GIÁM ĐỐC", "P. TRƯỞNG PHÒNG", chữ ký
-      - Nếu có → true, nếu không → false
-   
-   c) **Tên người (personName)**: 
-      - Nếu có tên người, trả về tên đầy đủ
-      - Nếu không có → null
-   
-   d) **Là trang LOG không (isLogPage)**:
-      - LOG = trang chỉ là log ảnh/log email, KHÔNG phải nội dung chính của biểu mẫu
-      - Ví dụ: screenshot hệ thống, ảnh log, trang in email (From/To/Subject, nhiều địa chỉ email)
-      - Các trang có tiêu đề, form, bảng biểu, hoặc nội dung BẢN TIN chính thì KHÔNG phải LOG (isLogPage = false)
+2. **PHÂN TÍCH NGƯỜI KÝ DUYỆT (End Signal - QUAN TRỌNG)**
+   - Chỉ trả về hasPersonName = true nếu tìm thấy tên NGƯỜI CÓ THẨM QUYỀN KÝ CHỐT (Approver) ở CUỐI TRANG (phần dưới cùng của trang).
+   - Tên người phải nằm ở phần cuối trang, thường kèm theo:
+     + "Người thực hiện", "Trực ban", "Dự báo viên", "GIÁM ĐỐC", "TRƯỞNG/PHÓ PHÒNG"
+     + Hoặc chỉ có tên người (như "Đồng Thanh Hải", "Lê Tiến Hải") ở cuối trang
+   - LOẠI TRỪ TUYỆT ĐỐI:
+     + Tên người ở giữa trang (không phải cuối trang)
+     + "Soát tin", "Người lập", "Kíp trực" (không phải người ký chốt)
+     + Tên trong nội dung văn bản (không phải phần ký)
+   - QUAN TRỌNG: Nếu tên người ở giữa trang hoặc không ở cuối trang → hasPersonName = false
+   - Nếu có -> Lấy personName và personRole.
 
-   e) **Là trang BẢN TIN NGUỒN (isBanTinNguonHeader)**:
-      - Nếu trang có header "Cộng hòa xã hội chủ nghĩa Việt Nam" (viết hoa/thường tuỳ ý) ở phía trên
-      - Và bên dưới có nội dung BẢN TIN (không phải COVER QT/KTKS)
-      - Thì đặt isBanTinNguonHeader = true, ngược lại = false
+3. **TRÍCH XUẤT THÔNG TIN METADATA**
+   - Broadcast Code: MET, NAV, SAR, WX, TUYEN (tìm trong header/mã bản tin).
+   - Service Code: NTX, RTP, EGC (tìm trong mã bản tin đài xử lý).
+   - Service Hint: Tìm chuỗi "-NTX", "-RTP", "-EGC" để gợi ý.
+   - isBanTinNguonHeader: CHỈ true nếu:
+     + Có header "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" ở đầu trang
+     + VÀ KHÔNG có formCode (không có khung "Mã số" ở góc)
+     + VÀ KHÔNG phải là trang của biểu mẫu QT/KTKS (không có tiêu đề "QUY TRÌNH PHÁT", "PHIẾU KIỂM TRA")
+     + VÀ là nội dung bản tin gốc (không phải "BẢN TIN NGUỒN ĐÃ ĐƯỢC XỬ LÝ" hay "BẢN TIN XỬ LÝ TRƯỚC KHI PHÁT")
+     + Ví dụ: Trang có header "CỘNG HÒA..." và tiêu đề "TIN BÃO TRÊN BIỂN ĐÔNG" → isBanTinNguonHeader = true
+     + Ví dụ: Trang có header "CỘNG HÒA..." nhưng có formCode "QT.MSI-BM.02" → isBanTinNguonHeader = false
+     + Ví dụ: Trang có header "CỘNG HÒA..." nhưng có tiêu đề "BẢN TIN NGUỒN ĐÃ ĐƯỢC XỬ LÝ" → isBanTinNguonHeader = false
 
-   f) **Trang LOGMAIL có gmail (hasGmail)**:
-      - Kiểm tra xem trong trang có chuỗi địa chỉ email chứa "@gmail.com" hay không
-      - Nếu có ít nhất một địa chỉ "@gmail.com" → hasGmail = true, ngược lại = false
+4. **PHÂN TÍCH LOG/EMAIL**
+   - isLogPage: Trang chụp màn hình, bảng log, email in.
+   - hasEmail: Có địa chỉ email trong trang log.
 
-**LƯU Ý QUAN TRỌNG:**
-- Số trang bắt đầu từ ${startPageNum}
-- Phải phân tích TẤT CẢ ${batchImages.length} trang
-- Mỗi trang phải có đầy đủ thông tin
-
-Trả về JSON format:
+OUTPUT JSON FORMAT (Chỉ trả về JSON):
 {
-  "broadcastCode": "MET" hoặc "NAV" hoặc "SAR" hoặc "WX" hoặc "TUYEN" hoặc null,
-  "serviceCode": "NTX" hoặc "RTP" hoặc "EGC" hoặc null,
+  "broadcastCode": "MET"|"NAV"|"SAR"|"WX"|"TUYEN"|null,
+  "serviceCode": "NTX"|"RTP"|"EGC"|null,
   "pages": [
     {
       "page": ${startPageNum},
-      "code": "QT.MSI-BM.01" hoặc null,
-      "hasPersonName": true hoặc false,
-      "personName": "Vũ Anh Tuấn" hoặc null,
-      "isLogPage": false,
-      "isBanTinNguonHeader": true hoặc false,
-      "hasGmail": true hoặc false
+      "formCode": "QT.MSI-BM.03" | "KTKS.MSI.TC-BM.01" | null,
+      "isNewFormStart": true | false,
+      "hasPersonName": true | false,
+      "personName": "Nguyễn Văn A" | null,
+      "personRole": "Trực ban" | null,
+      "isLogPage": true | false,
+      "isBanTinNguonHeader": true | false,
+      "hasEmail": true | false,
+      "serviceHint": "NTX" | "RTP" | "EGC" | null
     },
     ...
   ]
-}
-
-CHỈ trả về JSON, không có text giải thích nào khác.`;
+}`;
 
     // Prepare content parts with all images in batch
     const contentParts: any[] = batchImages.map(img => ({

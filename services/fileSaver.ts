@@ -100,22 +100,55 @@ export const saveFilesToDirectory = async (
   filesToSave: FileToSave[],
   folderStructureJson?: string
 ): Promise<void> => {
+  // Xóa và tạo lại TEMP_EXTRACT nếu có file trong đó
+  const tempExtractPaths = new Set<string>();
+  for (const fileInfo of filesToSave) {
+    if (fileInfo.path.startsWith('TEMP_EXTRACT/')) {
+      const pathParts = fileInfo.path.split('/').filter(p => p);
+      if (pathParts.length >= 2) {
+        // TEMP_EXTRACT/{folderName}/...
+        tempExtractPaths.add(pathParts[1]); // folderName
+      }
+    }
+  }
+  
+  // TEMP_EXTRACT: Không xóa folder, chỉ ghi đè file để kiểm tra
+  // File System Access API tự động ghi đè khi dùng { create: true }
+
   // Save all files
   for (const fileInfo of filesToSave) {
     const pathParts = fileInfo.path.split('/').filter(p => p);
     const filename = fileInfo.filename;
     
-    try {
-      const targetDir = await getOrCreateDirectory(rootDirHandle, pathParts);
-      const fileHandle = await targetDir.getFileHandle(filename, { create: true });
-      const writable = await fileHandle.createWritable();
-      const bytes = new Uint8Array(fileInfo.bytes);
-      await writable.write(bytes);
-      await writable.close();
-      console.log(`[FileSaver] Saved ${fileInfo.path}/${filename} (${fileInfo.bytes.length} bytes)`);
-    } catch (error) {
-      console.error(`[FileSaver] Error saving ${fileInfo.path}/${filename}:`, error);
-      throw new Error(`Lỗi khi lưu file ${fileInfo.path}/${filename}: ${(error as Error).message}`);
+    // Xử lý InvalidStateError: retry với fresh directory handle
+    let retryCount = 0;
+    const maxRetries = 2;
+    let saved = false;
+    
+    while (retryCount <= maxRetries && !saved) {
+      try {
+        // Lấy directory handle mới mỗi lần retry để tránh InvalidStateError
+        const targetDir = await getOrCreateDirectory(rootDirHandle, pathParts);
+        const fileHandle = await targetDir.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        const bytes = new Uint8Array(fileInfo.bytes);
+        await writable.write(bytes);
+        await writable.close();
+        console.log(`[FileSaver] Saved ${fileInfo.path}/${filename} (${fileInfo.bytes.length} bytes)`);
+        saved = true;
+      } catch (error: any) {
+        if (error.name === 'InvalidStateError' && retryCount < maxRetries) {
+          // InvalidStateError: refresh và retry
+          retryCount++;
+          console.warn(`[FileSaver] InvalidStateError for ${fileInfo.path}/${filename}, retrying (${retryCount}/${maxRetries})...`);
+          // Đợi một chút trước khi retry
+          await new Promise(resolve => setTimeout(resolve, 100));
+          continue;
+        }
+        // Nếu không phải InvalidStateError hoặc đã hết retry, throw error
+        console.error(`[FileSaver] Error saving ${fileInfo.path}/${filename}:`, error);
+        throw new Error(`Lỗi khi lưu file ${fileInfo.path}/${filename}: ${(error as Error).message}`);
+      }
     }
   }
 
