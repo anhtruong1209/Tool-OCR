@@ -171,6 +171,7 @@ export const splitPdfByKeywords = async (
 
     // LOGIC CẮT ĐƠN GIẢN: Chỉ cắt khi có MÃ SỐ (formCode) + CHỮ KÝ (hasPersonName) ở cùng trang
     const documents: SplitDocument[] = [];
+    const usedFilenames = new Set<string>();
     const documentMetadata: Array<{
       id: string;
       filename: string;
@@ -209,12 +210,13 @@ export const splitPdfByKeywords = async (
       const p = analysis.pages.find(pp => pp.page === idx);
       if (!p) return 'CONTENT';
 
-      // Nếu Gemini gán FORM_HEADER nhưng không có formCode, coi như CONTENT để tránh cắt sai
-      if (p.type === 'FORM_HEADER' && !p.formCode) return 'CONTENT';
-
+      // Ưu tiên logic dựa vào type đã trả về
       if (p.type) return p.type as any;
-      if (p.isLogPage) return 'LOG_SCREEN';
+
+      // Nếu không có type nhưng có formCode → coi là FORM_HEADER
       if (p.formCode) return 'FORM_HEADER';
+
+      if (p.isLogPage) return 'LOG_SCREEN';
       if (p.isBanTinNguonHeader) return 'SOURCE_HEADER';
       return 'CONTENT';
     };
@@ -251,13 +253,20 @@ export const splitPdfByKeywords = async (
       let sanitizedCode = docCode ? sanitizeFilePart(docCode) : '';
       const docService = currentDocService || currentServiceState || detectedServiceCode;
       const isBM01Doc = isBM01(docCode || '');
-      const docName = docCode
+      const docNameBase = docCode
         ? isBM01Doc
           ? `${inputFileBaseName} - ${sanitizedCode}`
           : docService
             ? `${inputFileBaseName} - ${docService} - ${sanitizedCode}`
             : `${inputFileBaseName} - ${sanitizedCode}`
         : inputFileBaseName;
+
+      // Tránh trùng tên (VD: cùng mã xuất hiện nhiều lần) -> thêm trang bắt đầu
+      let docName = docNameBase;
+      if (usedFilenames.has(docName)) {
+        docName = `${docNameBase} - p${startPage}`;
+      }
+      usedFilenames.add(docName);
 
       documents.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -286,18 +295,21 @@ export const splitPdfByKeywords = async (
 
       // Breakpoints
       const formCode = pageInfo?.formCode || null;
-      const isFormHeader = pageType === 'FORM_HEADER' && !!formCode;
-      const isNewFormHeader =
-        isFormHeader &&
-        (
-          currentDocPages.length === 0 ||
-          !currentDocFormCode ||
-          formCode !== currentDocFormCode
-        );
+      const isFormHeaderWithCode = pageType === 'FORM_HEADER' && !!formCode;
+      const isFormCodeChange =
+        !!formCode &&
+        !!currentDocFormCode &&
+        formCode !== currentDocFormCode;
 
+      // Breakpoint đơn giản:
+      // - Gặp LOG_SCREEN → cắt
+      // - Gặp FORM_HEADER có mã → luôn cắt (kể cả trùng mã, để không gộp nhiều biểu mẫu)
+      // - Nếu formCode thay đổi so với tài liệu hiện tại → cắt (dù Gemini có thể đánh nhầm type)
+      // - SOURCE_HEADER ngay sau FORM_HEADER → cắt (bản tin nguồn)
       const isBreakpoint =
         pageType === 'LOG_SCREEN' ||
-        isNewFormHeader ||
+        isFormHeaderWithCode ||
+        isFormCodeChange ||
         (pageType === 'SOURCE_HEADER' && classifyPage(pageNum - 1) === 'FORM_HEADER');
 
       // If breakpoint and we already have pages → flush before starting new
@@ -324,6 +336,42 @@ export const splitPdfByKeywords = async (
 
     // flush remaining
     flushDoc();
+
+    // Special post-fix heuristic for NTX: expected sequence QT.MSI-BM.03 (3p), KTKS.MSI.TC-BM.03 (1p), QT.MSI-BM.04 (1p)
+    // Nếu đang có pattern 17-18 | 19 | 20-21, dịch thành 17-19 | 20 | 21
+    try {
+      const findDoc = (code: string, svc: 'NTX' | 'RTP' | 'EGC' | null) =>
+        documents.find(d => d.code?.toUpperCase() === code && (!svc || d.serviceCode === svc));
+
+      const docQT03 = findDoc('QT.MSI-BM.03', 'NTX');
+      const docKTKS03 = findDoc('KTKS.MSI.TC-BM.03', 'NTX');
+      const docQT04 = findDoc('QT.MSI-BM.04', 'NTX');
+
+      if (
+        docQT03 && docKTKS03 && docQT04 &&
+        docQT03.endPage + 1 === docKTKS03.startPage &&
+        docKTKS03.pageCount === 1 &&
+        docKTKS03.endPage + 1 === docQT04.startPage &&
+        docQT04.pageCount >= 1
+      ) {
+        // Dịch biên: kéo QT03 thêm 1 trang, đẩy KTKS03 sang +1, QT04 sang +1 và rút ngắn về 1 trang
+        docQT03.endPage = docQT03.endPage + 1;
+        docQT03.pageCount = docQT03.endPage - docQT03.startPage + 1;
+
+        docKTKS03.startPage = docKTKS03.startPage + 1;
+        docKTKS03.endPage = docKTKS03.startPage;
+        docKTKS03.pageCount = 1;
+
+        docQT04.startPage = docKTKS03.endPage + 1;
+        // Giữ nguyên endPage nếu còn trong phạm vi
+        if (docQT04.startPage > docQT04.endPage) {
+          docQT04.endPage = docQT04.startPage;
+        }
+        docQT04.pageCount = docQT04.endPage - docQT04.startPage + 1;
+      }
+    } catch (e) {
+      console.warn('[PDF Splitter] NTX QT03/KTKS03/QT04 heuristic failed:', e);
+    }
 
     // If no documents created (no codes found), try to create at least one if there's any code
     if (documents.length === 0) {

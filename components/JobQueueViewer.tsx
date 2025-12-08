@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { jobQueue, Job } from '../services/jobQueue';
 import { syncFilesToDestination } from '../services/fileSync';
-import { CheckCircle, XCircle, Loader2, Download, Trash2, FileText, Sparkles, Zap, Clock, RefreshCw, FolderSync } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Download, Trash2, FileText, Sparkles, Zap, Clock, RefreshCw, FolderSync, Eye } from 'lucide-react';
 
 const TIPS = [
   "💡 Hệ thống đang quét mã số trên từng trang PDF...",
   "🔍 Đang phân tích và nhận diện chữ ký...",
-  "📦 Đang tách file và tạo ZIP...",
+  "📦 Đang tách file...",
   "⚡ Tối ưu hóa để tránh giới hạn API...",
   "🎯 Phát hiện và tách các trang LOG tự động...",
 ];
@@ -21,6 +21,12 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
   const [processingJob, setProcessingJob] = useState<Job | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [syncingJobs, setSyncingJobs] = useState<Set<string>>(new Set());
+  const [syncedJobs, setSyncedJobs] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [previewJob, setPreviewJob] = useState<Job | null>(null);
+  const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
+  const [previewOriginalUrl, setPreviewOriginalUrl] = useState<string | null>(null);
+  const [selectedDocIndex, setSelectedDocIndex] = useState<number>(0);
 
   useEffect(() => {
     // Subscribe to job updates
@@ -83,38 +89,125 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
     jobQueue.removeJob(jobId);
   };
 
-  const handleSyncToFolder = async (job: Job) => {
-    if (syncingJobs.has(job.id)) return; // Đang sync, bỏ qua
-    
-    try {
-      setSyncingJobs(prev => new Set(prev).add(job.id));
-      
-      // Sử dụng folder mặc định (folder lúc đầu) - không yêu cầu chọn folder nữa
-      if (!job.rootDirHandle) {
-        throw new Error('Không tìm thấy folder đích. Vui lòng thử lại.');
-      }
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
 
-      // Đồng bộ file từ TEMP_EXTRACT vào folder đích (dùng chính folder rootDirHandle)
+  // Cleanup object URLs
+  useEffect(() => {
+    return () => {
+      if (previewDocUrl) URL.revokeObjectURL(previewDocUrl);
+      if (previewOriginalUrl) URL.revokeObjectURL(previewOriginalUrl);
+    };
+  }, [previewDocUrl, previewOriginalUrl]);
+
+  const openPreview = async (job: Job) => {
+    // release old urls
+    if (previewDocUrl) URL.revokeObjectURL(previewDocUrl);
+    if (previewOriginalUrl) URL.revokeObjectURL(previewOriginalUrl);
+
+    // original PDF url
+    const origUrl = URL.createObjectURL(job.file);
+    setPreviewOriginalUrl(origUrl);
+    setPreviewJob(job);
+    setSelectedDocIndex(0);
+
+    // load first doc url
+    await loadDocUrl(job, 0);
+  };
+
+  const loadDocUrl = async (job: Job, index: number) => {
+    if (!job.rootDirHandle || !job.result) return;
+    const summary = job.result.extractionSummary;
+    const docs = summary?.documents || job.result.documents || [];
+    const doc = docs[index];
+    if (!doc || !doc.filename) return;
+
+    try {
+      const pathParts = (job.result.extractionFolderPath || '').split('/').filter(Boolean);
+      pathParts.push('PDFS');
+      let current = job.rootDirHandle;
+      for (const part of pathParts) {
+        current = await current.getDirectoryHandle(part, { create: false });
+      }
+      const fileHandle = await current.getFileHandle(doc.filename, { create: false });
+      const file = await fileHandle.getFile();
+      const url = URL.createObjectURL(file);
+      if (previewDocUrl) URL.revokeObjectURL(previewDocUrl);
+      setPreviewDocUrl(url);
+    } catch (e) {
+      console.error('Preview load error', e);
+      showToast('error', 'Không đọc được file đã cắt (cần mở cùng thư mục gốc đã chọn)');
+    }
+  };
+
+  const docsOfPreview = previewJob
+    ? (previewJob.result?.extractionSummary?.documents || previewJob.result?.documents || [])
+    : [];
+
+  const syncJob = async (job: Job, quiet = false): Promise<boolean> => {
+    if (syncingJobs.has(job.id)) return false;
+    if (!job.rootDirHandle) {
+      if (!quiet) showToast('error', 'Không tìm thấy folder đích. Vui lòng thử lại.');
+      return false;
+    }
+
+    setSyncingJobs(prev => new Set(prev).add(job.id));
+    try {
       const result = await syncFilesToDestination(
         job.rootDirHandle,
         job.file.name,
         job.rootDirHandle
       );
 
-      if (result.failed > 0) {
-        alert(`Đồng bộ hoàn tất với một số lỗi:\n- Thành công: ${result.success} file\n- Thất bại: ${result.failed} file\n\nLỗi:\n${result.errors.join('\n')}`);
-      } else {
-        alert(`Đồng bộ thành công ${result.success} file vào folder "${job.rootDirHandle.name}"!`);
+      setSyncedJobs(prev => new Set(prev).add(job.id));
+
+      if (!quiet) {
+        if (result.failed > 0) {
+          showToast(
+            'error',
+            `Đồng bộ xong nhưng có lỗi: ✅ ${result.success} • ❌ ${result.failed}`
+          );
+        } else {
+          showToast('success', `Đồng bộ thành công ${result.success} file vào "${job.rootDirHandle.name}"`);
+        }
       }
+      return result.failed === 0;
     } catch (error: any) {
       console.error('[JobQueueViewer] Error syncing files:', error);
-      alert(`Lỗi khi đồng bộ file: ${error.message}`);
+      if (!quiet) showToast('error', `Lỗi đồng bộ: ${error.message}`);
+      return false;
     } finally {
       setSyncingJobs(prev => {
         const next = new Set(prev);
         next.delete(job.id);
         return next;
       });
+    }
+  };
+
+  const handleSyncToFolder = async (job: Job) => {
+    await syncJob(job, false);
+  };
+
+  const handleSyncAll = async () => {
+    const targets = jobs.filter(j => j.status === 'completed' && !syncedJobs.has(j.id));
+    if (targets.length === 0) {
+      showToast('success', 'Tất cả file đã đồng bộ');
+      return;
+    }
+    let successCount = 0;
+    let failCount = 0;
+    for (const job of targets) {
+      const ok = await syncJob(job, true);
+      if (ok) successCount += 1;
+      else failCount += 1;
+    }
+    if (failCount === 0) {
+      showToast('success', `Đồng bộ xong ${successCount} file`);
+    } else {
+      showToast('error', `Đồng bộ xong: ✅ ${successCount} • ❌ ${failCount}`);
     }
   };
 
@@ -190,9 +283,25 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
 
   return (
     <div className="space-y-4 mb-6">
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-2xl border ${
+          toast.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            : 'bg-rose-50 text-rose-800 border-rose-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-4 h-4" />
+            ) : (
+              <XCircle className="w-4 h-4" />
+            )}
+            <span className="text-sm font-semibold">{toast.message}</span>
+          </div>
+        </div>
+      )}
       {/* File List - Show all files immediately */}
-      <div className="glass-strong rounded-xl p-6 border border-white/20">
-        <div className="flex items-center justify-between mb-4">
+        <div className="glass-strong rounded-xl p-6 border border-white/20">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
             <h3 className="text-lg font-bold text-dark">Danh sách file</h3>
             <p className="text-sm text-dark/70">
@@ -205,6 +314,29 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
               <span className="text-sm font-bold text-dark">{formatTimer(elapsedTime)}</span>
             </div>
           )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSyncAll}
+              disabled={syncingJobs.size > 0}
+              className={`px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border ${
+                syncingJobs.size > 0
+                  ? 'glass-light bg-dark/10 text-dark/50 cursor-not-allowed border-dark/10'
+                  : 'glass bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-transparent'
+              }`}
+            >
+              {syncingJobs.size > 0 ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Đang đồng bộ...
+                </>
+              ) : (
+                <>
+                  <FolderSync className="w-4 h-4" />
+                  Đồng bộ tất cả
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin">
@@ -299,7 +431,9 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                         className={`px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border ${
                           syncingJobs.has(job.id)
                             ? 'glass-light bg-dark/10 text-dark/50 cursor-not-allowed border-dark/10'
-                            : 'glass bg-dark/30 hover:bg-dark/40 text-dark border-dark/30'
+                            : syncedJobs.has(job.id)
+                              ? 'glass bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'glass bg-dark/30 hover:bg-dark/40 text-dark border-dark/30'
                         }`}
                         title="Đồng bộ vào folder"
                       >
@@ -308,12 +442,25 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                             <Loader2 className="w-4 h-4 animate-spin" />
                             Đang đồng bộ...
                           </>
+                        ) : syncedJobs.has(job.id) ? (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            Đã đồng bộ
+                          </>
                         ) : (
                           <>
                             <FolderSync className="w-4 h-4" />
                             Đồng bộ vào folder
                           </>
                         )}
+                      </button>
+                      <button
+                        onClick={() => openPreview(job)}
+                        className="px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border glass bg-dark/20 hover:bg-dark/30 text-dark border-dark/30"
+                        title="Xem so sánh gốc / đã cắt"
+                      >
+                        <Eye className="w-4 h-4" />
+                        So sánh
                       </button>
                     </>
                   )}
@@ -366,6 +513,105 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
             Tải lại / Upload mới
           </button>
         )}
+      </div>
+
+      {previewJob && (
+        <PreviewModal
+          job={previewJob}
+          docs={docsOfPreview}
+          selectedIndex={selectedDocIndex}
+          onSelect={(idx) => {
+            setSelectedDocIndex(idx);
+            loadDocUrl(previewJob, idx);
+          }}
+          docUrl={previewDocUrl}
+          originalUrl={previewOriginalUrl}
+          onClose={() => {
+            setPreviewJob(null);
+            setPreviewDocUrl(null);
+            setPreviewOriginalUrl(null);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Modal/Panel for preview (simple overlay)
+const PreviewModal: React.FC<{
+  job: Job;
+  docs: any[];
+  selectedIndex: number;
+  onSelect: (idx: number) => void;
+  docUrl: string | null;
+  originalUrl: string | null;
+  onClose: () => void;
+}> = ({ job, docs, selectedIndex, onSelect, docUrl, originalUrl, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">So sánh PDF gốc / đã cắt</h3>
+            <p className="text-xs text-slate-500 truncate">
+              {job.file.name}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-800 px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-sm"
+          >
+            Đóng
+          </button>
+        </div>
+
+        <div className="flex flex-1 min-h-0">
+          {/* Left: original */}
+          <div className="w-1/2 border-r flex flex-col">
+            <div className="px-3 py-2 border-b bg-slate-50 text-sm font-semibold text-slate-700">
+              PDF gốc
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center">
+              {originalUrl ? (
+                <iframe src={originalUrl} title="original" className="w-full h-full" />
+              ) : (
+                <p className="text-sm text-slate-500">Không thể tải PDF gốc</p>
+              )}
+            </div>
+          </div>
+
+          {/* Right: split list + viewer */}
+          <div className="w-1/2 flex flex-col">
+            <div className="px-3 py-2 border-b bg-slate-50 text-sm font-semibold text-slate-700">
+              File đã cắt
+            </div>
+            <div className="flex-1 grid grid-cols-3 min-h-0">
+              <div className="border-r overflow-auto bg-white">
+                {docs.map((d, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => onSelect(idx)}
+                    className={`w-full text-left px-3 py-2 border-b hover:bg-slate-50 text-sm ${
+                      idx === selectedIndex ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                    }`}
+                  >
+                    <div className="font-semibold text-slate-800 truncate">{d.filename || d.code || `Doc ${idx + 1}`}</div>
+                    <div className="text-xs text-slate-500">
+                      {d.startPage ? `Trang ${d.startPage}-${d.endPage}` : ''}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="col-span-2 bg-slate-100 flex items-center justify-center overflow-auto">
+                {docUrl ? (
+                  <iframe src={docUrl} title="split" className="w-full h-full" />
+                ) : (
+                  <p className="text-sm text-slate-500 px-4">Chọn file để xem</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

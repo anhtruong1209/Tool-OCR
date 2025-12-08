@@ -12,6 +12,7 @@ export interface Job {
   startTime?: number;
   endTime?: number;
   rootDirHandle: FileSystemDirectoryHandle; // Root directory handle for saving files
+  synced?: boolean; // đã đồng bộ?
 }
 
 export interface JobQueueConfig {
