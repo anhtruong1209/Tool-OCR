@@ -199,7 +199,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3 mb-4">
             {/* Logo */}
             <div className="logo-placeholder">
-              <img id="app-logo" src="LOGO.png" alt="Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => {
+              <img id="app-logo" src="public/LOGO.png" alt="Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
                 const placeholderText = document.getElementById('logo-placeholder-text');
