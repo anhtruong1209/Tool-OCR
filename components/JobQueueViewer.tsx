@@ -548,27 +548,27 @@ const PreviewModal: React.FC<{
   onClose: () => void;
 }> = ({ job, docs, selectedIndex, onSelect, docUrl, originalUrl, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-1 sm:p-3">
+      <div className="bg-white shadow-2xl w-[100vw] h-[90vh] max-w-none overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2 border-b">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">So sánh PDF gốc / đã cắt</h3>
-            <p className="text-xs text-slate-500 truncate">
+            <h3 className="text-sm font-bold text-slate-900">So sánh PDF gốc / đã cắt</h3>
+            <p className="text-[11px] text-slate-500 truncate max-w-[420px]">
               {job.file.name}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-800 px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-sm"
+            className="text-slate-500 hover:text-slate-800 px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold"
           >
             Đóng
           </button>
         </div>
 
-        <div className="flex flex-1 min-h-0">
+        <div className="grid grid-cols-12 flex-1 min-h-0">
           {/* Left: original */}
-          <div className="w-1/2 border-r flex flex-col">
-            <div className="px-3 py-2 border-b bg-slate-50 text-sm font-semibold text-slate-700">
+          <div className="col-span-5 border-r flex flex-col min-h-0">
+            <div className="px-3 py-2 border-b bg-slate-50 text-xs font-semibold text-slate-700">
               PDF gốc
             </div>
             <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center">
@@ -581,12 +581,12 @@ const PreviewModal: React.FC<{
           </div>
 
           {/* Right: split list + viewer */}
-          <div className="w-1/2 flex flex-col">
-            <div className="px-3 py-2 border-b bg-slate-50 text-sm font-semibold text-slate-700">
+          <div className="col-span-7 flex flex-col min-h-0">
+            <div className="px-3 py-2 border-b bg-slate-50 text-xs font-semibold text-slate-700">
               File đã cắt
             </div>
-            <div className="flex-1 grid grid-cols-3 min-h-0">
-              <div className="border-r overflow-auto bg-white">
+            <div className="flex-1 grid grid-cols-12 min-h-0">
+              <div className="col-span-4 border-r overflow-auto bg-white">
                 {docs.map((d, idx) => (
                   <button
                     key={idx}
@@ -602,7 +602,7 @@ const PreviewModal: React.FC<{
                   </button>
                 ))}
               </div>
-              <div className="col-span-2 bg-slate-100 flex items-center justify-center overflow-auto">
+              <div className="col-span-8 bg-slate-100 flex items-center justify-center overflow-auto">
                 {docUrl ? (
                   <iframe src={docUrl} title="split" className="w-full h-full" />
                 ) : (

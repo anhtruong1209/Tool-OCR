@@ -296,6 +296,11 @@ export const splitPdfByKeywords = async (
       // Breakpoints
       const formCode = pageInfo?.formCode || null;
       const isFormHeaderWithCode = pageType === 'FORM_HEADER' && !!formCode;
+      const pageService = getServiceFromPage(pageInfo);
+      const isServiceChange =
+        !!pageService &&
+        !!currentDocService &&
+        pageService !== currentDocService;
       const isFormCodeChange =
         !!formCode &&
         !!currentDocFormCode &&
@@ -305,11 +310,13 @@ export const splitPdfByKeywords = async (
       // - Gặp LOG_SCREEN → cắt
       // - Gặp FORM_HEADER có mã → luôn cắt (kể cả trùng mã, để không gộp nhiều biểu mẫu)
       // - Nếu formCode thay đổi so với tài liệu hiện tại → cắt (dù Gemini có thể đánh nhầm type)
+      // - Nếu service (NTX/RTP/EGC) thay đổi so với tài liệu hiện tại → cắt
       // - SOURCE_HEADER ngay sau FORM_HEADER → cắt (bản tin nguồn)
       const isBreakpoint =
         pageType === 'LOG_SCREEN' ||
         isFormHeaderWithCode ||
         isFormCodeChange ||
+        isServiceChange ||
         (pageType === 'SOURCE_HEADER' && classifyPage(pageNum - 1) === 'FORM_HEADER');
 
       // If breakpoint and we already have pages → flush before starting new
@@ -327,11 +334,28 @@ export const splitPdfByKeywords = async (
       if (isBreakpoint || currentDocPages.length === 0) {
         currentDocPages = [];
         currentDocFormCode = formCode || null;
-        currentDocService = getServiceFromPage(pageInfo) || currentServiceState || null;
+        currentDocService = pageService || currentServiceState || null;
       }
 
       // Push page into current doc
       currentDocPages.push(pageNum);
+
+      // Guard: nếu đang trong doc và gặp trang CONTENT nhưng serviceHint khác với currentDocService thì cắt trước trang này
+      const serviceHintThisPage = getServiceFromPage(pageInfo);
+      if (
+        currentDocPages.length > 0 &&
+        pageType === 'CONTENT' &&
+        serviceHintThisPage &&
+        currentDocService &&
+        serviceHintThisPage !== currentDocService
+      ) {
+        // bỏ trang hiện tại sang doc mới
+        currentDocPages.pop();
+        flushDoc();
+        currentDocPages = [pageNum];
+        currentDocFormCode = formCode || null;
+        currentDocService = serviceHintThisPage;
+      }
     }
 
     // flush remaining
