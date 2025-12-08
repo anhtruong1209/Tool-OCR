@@ -80,8 +80,8 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
       className={`
         relative border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-200
         ${disabled
-          ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
-          : 'border-blue-300 bg-blue-50/50 hover:bg-blue-50 hover:border-blue-400 cursor-pointer'
+          ? 'border-white/20 bg-white/5 cursor-not-allowed opacity-40'
+          : 'border-white/40 bg-white/10 hover:bg-white/15 hover:border-white/60 cursor-pointer'
         }
       `}
     >
@@ -95,14 +95,14 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
       />
 
       <div className="flex flex-col items-center justify-center gap-4 pointer-events-none relative z-0">
-        <div className={`p-4 rounded-full ${disabled ? 'bg-slate-100' : 'bg-blue-100 text-blue-600'}`}>
-          {disabled ? <FileText className="w-8 h-8 text-slate-400" /> : <Upload className="w-8 h-8" />}
+        <div className={`p-4 rounded-full ${disabled ? 'bg-white/10' : 'bg-white/20 text-white'}`}>
+          {disabled ? <FileText className="w-8 h-8 text-white/40" /> : <Upload className="w-8 h-8" />}
         </div>
         <div>
-          <p className="text-lg font-semibold text-slate-700">
+          <p className="text-lg font-semibold text-white">
             {multiple ? 'Tải lên nhiều file PDF' : 'Tải lên hóa đơn PDF'}
           </p>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-white/70 mt-1">
             {multiple
               ? 'Kéo thả hoặc click để chọn nhiều file (Max 10MB/file)'
               : 'Kéo thả hoặc click để chọn file (Max 10MB)'}

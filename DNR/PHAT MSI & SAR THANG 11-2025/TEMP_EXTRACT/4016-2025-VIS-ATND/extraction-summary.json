@@ -2,10 +2,10 @@
   "originalFileName": "4016-2025-VIS-ATND.pdf",
   "broadcastCode": "MET",
   "serviceCode": "NTX",
-  "generatedAt": "2025-12-05T09:23:09.211Z",
+  "generatedAt": "2025-12-08T02:57:02.561Z",
   "documents": [
     {
-      "id": "ueb7xzaxc",
+      "id": "jik0q878x",
       "filename": "4016-2025-VIS-ATND - QT.MSI-BM.01.pdf",
       "code": "QT.MSI-BM.01",
       "serviceCode": "NTX",
@@ -15,7 +15,7 @@
       "recommendedPath": "COVER/COVER/MET"
     },
     {
-      "id": "020h38l5f",
+      "id": "y7r6ai8pc",
       "filename": "4016-2025-VIS-ATND - KTKS.MSI.TC-BM.01.pdf",
       "code": "KTKS.MSI.TC-BM.01",
       "serviceCode": "NTX",
@@ -25,7 +25,7 @@
       "recommendedPath": "COVER/KTKSTC BM 01/MET"
     },
     {
-      "id": "r2qj0pv6f",
+      "id": "kf3o3n577",
       "filename": "4016-2025-VIS-ATND.pdf",
       "code": null,
       "serviceCode": "NTX",
@@ -35,17 +35,17 @@
       "recommendedPath": "BAN TIN NGUON/MET"
     },
     {
-      "id": "zf96x8akh",
+      "id": "pketylb33",
       "filename": "4016-2025-VIS-ATND - RTP - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "serviceCode": "RTP",
       "startPage": 6,
       "endPage": 7,
       "pageCount": 2,
-      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/MET"
+      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "8mqclz50w",
+      "id": "yndkho3ed",
       "filename": "4016-2025-VIS-ATND - RTP - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "serviceCode": "RTP",
@@ -55,7 +55,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "tjqe3s1v3",
+      "id": "4ymy70yy8",
       "filename": "4016-2025-VIS-ATND - RTP - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "serviceCode": "RTP",
@@ -65,7 +65,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "ltfns7i7v",
+      "id": "307xjehds",
       "filename": "4016-2025-VIS-ATND - RTP - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "serviceCode": "RTP",
@@ -75,7 +75,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "su1k1gk33",
+      "id": "832d2jvuj",
       "filename": "4016-2025-VIS-ATND - NTX - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "NTX",
@@ -85,7 +85,7 @@
       "recommendedPath": "DICH VU NTX/KIEM TRA KIEM SOAT SAU PHAT/MET"
     },
     {
-      "id": "18z5tfv46",
+      "id": "cq8vivxze",
       "filename": "4016-2025-VIS-ATND.pdf",
       "code": null,
       "serviceCode": "NTX",
@@ -95,7 +95,7 @@
       "recommendedPath": "BAN TIN NGUON/MET"
     },
     {
-      "id": "j8xd4pwl9",
+      "id": "hbskfp7i5",
       "filename": "4016-2025-VIS-ATND - NTX - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "serviceCode": "NTX",
@@ -105,7 +105,7 @@
       "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "kspo13kt1",
+      "id": "lerb6nf28",
       "filename": "4016-2025-VIS-ATND - NTX - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "serviceCode": "NTX",
@@ -115,7 +115,7 @@
       "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "hpefdxpnj",
+      "id": "ypqxt5axk",
       "filename": "4016-2025-VIS-ATND - NTX - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "serviceCode": "NTX",
@@ -125,7 +125,7 @@
       "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "rzcji2941",
+      "id": "czd0zuh7q",
       "filename": "4016-2025-VIS-ATND - NTX - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "NTX",

@@ -189,210 +189,231 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col overflow-hidden relative">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 z-0 opacity-30 pointer-events-none" style={{
-        backgroundImage: `radial-gradient(#cbd5e1 1px, transparent 1px)`,
-        backgroundSize: '18px 18px'
-      }}></div>
-
-      {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-800 h-12 shrink-0 z-30 shadow-md relative">
-        <div className="w-full px-4 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-1.5 rounded-lg text-white shadow-inner">
-              <BrainCircuit size={18} strokeWidth={2.5} />
+    <div className="min-h-screen flex overflow-hidden relative">
+      {/* Sidebar Menu - Left */}
+      <aside className="w-64 shrink-0 glass-strong border-r border-white/20 flex flex-col z-20">
+        {/* Logo & Brand */}
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-3 mb-4">
+            {/* Logo */}
+            <div className="logo-placeholder">
+              <img id="app-logo" src="LOGO.png" alt="Logo" className="w-full h-full object-contain rounded-lg" onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const placeholderText = document.getElementById('logo-placeholder-text');
+                if (placeholderText) placeholderText.style.display = 'block';
+              }} />
+              <span className="text-white/60 text-xs text-center px-2 hidden" id="logo-placeholder-text">Paste Logo</span>
             </div>
-            <h1 className="font-semibold text-base text-white tracking-tight hidden md:block">
-              Vishipel AI <span className="opacity-30 font-light mx-2">|</span>
-              <span className="text-blue-300 font-medium text-xs">
-                {docType === 'INVOICE' && 'Xử lý Hóa đơn GTGT'}
-                {docType === 'INCIDENT' && 'Xử lý Báo cáo Sự cố'}
-                {docType === 'SPLIT' && 'Bộ Tách PDF Tự Động'}
-              </span>
-            </h1>
-            <h1 className="font-semibold text-base text-white md:hidden">Vishipel AI</h1>
+            <div className="flex-1">
+              <h1 className="text-xl font-black text-white tracking-tight">
+                <span className="bg-gradient-to-r from-blue-400 via-blue-500 to-orange-500 bg-clip-text text-transparent">
+                  VISHIPEL
+                </span>
+              </h1>
+              <p className="text-xs font-bold text-orange-400 uppercase tracking-wider">TOOL</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => {
+              setDocType('SPLIT');
+              if (status === ProcessingStatus.SUCCESS) handleReset();
+            }}
+            className={`w-full px-4 py-3 rounded-xl text-left transition-all flex items-center gap-3 ${
+              docType === 'SPLIT'
+                ? 'glass bg-white/20 text-white font-semibold'
+                : 'glass-light text-white/70 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Scissors size={20} />
+            <span>Tách PDF</span>
+          </button>
+        </nav>
+
+        {/* Footer Info */}
+        <div className="p-4 border-t border-white/10">
+          <div className="glass-light rounded-lg p-3 text-white/60 text-xs">
+            <p className="font-semibold text-white/80 mb-1">Vishipel TOOL</p>
+            <p>Xử lý PDF thông minh</p>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content - Right */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+
+        {/* Top Bar */}
+        <header className="glass border-b border-white/20 h-16 shrink-0 z-30 flex items-center justify-between px-6">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-bold text-white">
+              {docType === 'SPLIT' && 'Bộ Tách PDF Tự Động'}
+              {docType === 'INVOICE' && 'Xử lý Hóa đơn GTGT'}
+              {docType === 'INCIDENT' && 'Xử lý Báo cáo Sự cố'}
+            </h2>
           </div>
 
           {status === ProcessingStatus.SUCCESS && (
             <button
               onClick={handleReset}
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition-colors shadow-sm"
+              className="glass-light hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-all text-sm font-semibold"
             >
               Upload file mới
             </button>
           )}
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="flex-grow flex flex-col h-[calc(100vh-3rem)] relative z-10">
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col overflow-hidden relative z-10 p-6">
 
-        {/* IDLE & PROCESSING STATES */}
-        {status !== ProcessingStatus.SUCCESS && (
-          <div className="flex-grow flex flex-col items-center justify-start p-4 md:p-6 overflow-y-auto">
+          {/* IDLE & PROCESSING STATES */}
+          {status !== ProcessingStatus.SUCCESS && (
+            <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto">
 
-            {status === ProcessingStatus.IDLE && (
-              <div className="w-full max-w-5xl mx-auto space-y-6">
-                <section className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700 bg-white/90 backdrop-blur-sm p-5 md:p-6 rounded-2xl shadow-md border border-slate-100">
-                  <div className="mx-auto max-w-2xl">
-                    <p className="text-[10px] uppercase tracking-[0.35em] text-slate-400 mb-2">Vishipel AI</p>
-                    <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
-                      Bộ Tách PDF Tự Động
-                    </h2>
-                    <p className="text-slate-600 mb-4 text-sm">
-                      Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo cấu trúc nghiệp vụ.
-                    </p>
-                  </div>
-
-                  {/* Document Type Selector */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                    {/*
-                            <button ...>...</button>
-                            <button ...>...</button>
-                            */}
-                    <button
-                      onClick={() => setDocType('SPLIT')}
-                      className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition-all ${docType === 'SPLIT'
-                        ? 'border-purple-500 bg-gradient-to-br from-purple-50 via-white to-purple-100 text-purple-800 shadow-sm ring-1 ring-purple-200'
-                        : 'border-slate-200 bg-white hover:border-purple-300 text-slate-600'
-                        }`}
-                    >
-                      <div className={`p-3 rounded-2xl ${docType === 'SPLIT' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
-                        <Scissors className="w-7 h-7" />
-                      </div>
-                      <span className="font-semibold text-base">Tách File PDF</span>
-                      <span className="text-xs text-slate-400 font-normal text-center">Cắt file tự động theo nghiệp vụ</span>
-                    </button>
-                  </div>
-                </section>
-
-                <section className="grid gap-4 lg:grid-cols-2 items-start">
-                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4 transition hover:shadow-lg hover:border-indigo-200">
-                    <div className="flex flex-col gap-2 text-left">
-                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 1</p>
-                      <h3 className="text-xl font-semibold text-slate-900">Chọn thư mục lưu kết quả</h3>
-                      <p className="text-sm text-slate-500">Chọn thư mục đích trước khi tải file PDF lên.</p>
+              {status === ProcessingStatus.IDLE && (
+                <div className="w-full max-w-5xl mx-auto space-y-6">
+                  <section className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700 glass-strong p-8 md:p-10 rounded-3xl">
+                    <div className="mx-auto max-w-2xl">
+                      <p className="text-xs uppercase tracking-[0.5em] text-white/60 mb-3 font-semibold">Vishipel TOOL</p>
+                      <h2 className="text-3xl md:text-4xl font-black text-white mb-3 tracking-tight">
+                        Bộ Tách PDF Tự Động (Đài TTDH Đà Nẵng)
+                      </h2>
+                      <p className="text-white/80 mb-6 text-base">
+                        Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo cấu trúc nghiệp vụ.
+                      </p>
                     </div>
-                    <button
-                      onClick={handleSelectDestinationFolder}
-                      className="w-full px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 text-sm"
-                    >
-                      <FolderOpen size={20} />
-                      {directoryInfo ? `Đã chọn: ${directoryInfo.name}` : 'Chọn thư mục lưu file'}
-                    </button>
-                    {directoryInfo && (
-                      <div className="text-xs md:text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                        ✓ Thư mục "{directoryInfo.name}" đã được chọn. Bạn có thể upload file PDF bên dưới.
+                  </section>
+
+                  <section className="grid gap-6 lg:grid-cols-2 items-start">
+                    <div className="glass-strong rounded-2xl p-6 flex flex-col gap-4 transition-all hover:bg-white/20">
+                      <div className="flex flex-col gap-2 text-left">
+                        <p className="text-xs uppercase tracking-[0.3em] text-white/60 font-semibold">Bước 1</p>
+                        <h3 className="text-xl font-bold text-white">Chọn thư mục lưu kết quả</h3>
+                        <p className="text-sm text-white/70">Chọn thư mục đích trước khi tải file PDF lên.</p>
+                      </div>
+                      <button
+                        onClick={handleSelectDestinationFolder}
+                        className="w-full px-5 py-3 bg-gradient-to-r from-blue-500/30 to-orange-500/30 hover:from-blue-500/40 hover:to-orange-500/40 text-white rounded-xl font-semibold transition-all shadow-lg hover:scale-105 flex items-center justify-center gap-3 text-sm border border-orange-400/30"
+                      >
+                        <FolderOpen size={20} />
+                        {directoryInfo ? `Đã chọn: ${directoryInfo.name}` : 'Chọn thư mục lưu file'}
+                      </button>
+                      {directoryInfo && (
+                        <div className="text-sm text-green-300 bg-green-500/20 border border-green-400/30 rounded-lg p-3 glass-light">
+                          ✓ Thư mục "{directoryInfo.name}" đã được chọn. Bạn có thể upload file PDF bên dưới.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="glass-strong rounded-2xl p-6 flex flex-col gap-4 transition-all hover:bg-white/20">
+                      <div className="flex flex-col gap-2 text-left">
+                        <p className="text-xs uppercase tracking-[0.3em] text-white/60 font-semibold">Bước 2</p>
+                        <h3 className="text-xl font-bold text-white">Tải lên file PDF</h3>
+                        <p className="text-sm text-white/70">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
+                      </div>
+                      <div className="glass-light rounded-2xl p-4 border border-white/20">
+                        <UploadArea
+                          onFileSelect={handleFileSelect}
+                          onMultipleFilesSelect={handleMultipleFilesSelect}
+                          multiple={docType === 'SPLIT'}
+                          disabled={docType === 'SPLIT' && !directoryInfo}
+                        />
+                      </div>
+                      <div className="text-xs text-white/60 flex items-center gap-2">
+                        <span className="inline-flex w-2 h-2 rounded-full bg-white/40"></span>
+                        {directoryInfo
+                          ? 'Sẵn sàng nhận file PDF – chọn file để bắt đầu tách.'
+                          : 'Vui lòng chọn thư mục lưu kết quả trước khi upload file.'}
+                      </div>
+                    </div>
+                    
+                    {docType === 'SPLIT' && (
+                      <div className="lg:col-span-2 glass-strong rounded-2xl p-4 md:p-6">
+                        <JobQueueViewer onReset={handleReset} />
                       </div>
                     )}
-                  </div>
-
-                  <div className="rounded-2xl bg-white shadow-md border border-slate-100 p-5 flex flex-col gap-4 transition hover:shadow-lg hover:border-indigo-200">
-                    <div className="flex flex-col gap-2 text-left">
-                      <p className="text-[11px] uppercase tracking-[0.35em] text-slate-400">Bước 2</p>
-                      <h3 className="text-xl font-semibold text-slate-900">Tải lên file PDF</h3>
-                      <p className="text-sm text-slate-500">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
-                    </div>
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-dashed border-slate-200">
-                      <UploadArea
-                        onFileSelect={handleFileSelect}
-                        onMultipleFilesSelect={handleMultipleFilesSelect}
-                        multiple={docType === 'SPLIT'}
-                        disabled={docType === 'SPLIT' && !directoryInfo}
-                      />
-                    </div>
-                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                      <span className="inline-flex w-2 h-2 rounded-full bg-slate-300"></span>
-                      {directoryInfo
-                        ? 'Sẵn sàng nhận file PDF – chọn file để bắt đầu tách.'
-                        : 'Vui lòng chọn thư mục lưu kết quả trước khi upload file.'}
-                    </div>
-                  </div>
-                  
-                  {docType === 'SPLIT' && (
-                    <div className="lg:col-span-2 bg-white/80 border border-slate-100 rounded-2xl shadow-md p-3 md:p-4">
-                      <JobQueueViewer onReset={handleReset} />
-                    </div>
-                  )}
-                </section>
-              </div>
-            )}
-
-            {/* Show JobQueueViewer when processing in SPLIT mode */}
-            {status === ProcessingStatus.ANALYZING && docType === 'SPLIT' && (
-              <div className="w-full max-w-4xl">
-                <JobQueueViewer onReset={handleReset} />
-              </div>
-            )}
-
-            {(status === ProcessingStatus.CONVERTING || status === ProcessingStatus.ANALYZING) && docType !== 'SPLIT' && (
-              <div className="text-center animate-in fade-in zoom-in duration-300 bg-white/90 p-8 rounded-2xl shadow-2xl border border-white">
-                <div className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-6 border-blue-200 border-t-blue-600"></div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">
-                  {status === ProcessingStatus.CONVERTING ? 'Đang đọc tài liệu...' : 'Đang xử lý dữ liệu...'}
-                </h3>
-                <p className="text-slate-500">
-                  Vishipel AI đang phân tích văn bản...
-                </p>
-              </div>
-            )}
-
-            {status === ProcessingStatus.ERROR && (
-              <div className="max-w-md w-full mt-6 p-6 bg-white border border-red-200 rounded-xl text-center shadow-lg animate-in shake">
-                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle size={24} />
+                  </section>
                 </div>
-                <h3 className="text-lg font-bold text-red-700 mb-2">Xử lý thất bại</h3>
-                <p className="text-slate-600 mb-6">{errorMsg}</p>
-                <button onClick={handleReset} className="px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
-                  Thử lại
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              )}
 
-        {/* SUCCESS STATE */}
-        {status === ProcessingStatus.SUCCESS && reportData && (
-          <div className="flex-grow flex flex-col lg:flex-row overflow-hidden h-full">
-
-            {/* Left Pane: PDF Preview (Simplified for Splitter, Full for others) */}
-            <div className="lg:w-1/2 h-[40vh] lg:h-full bg-slate-800 overflow-auto p-4 md:p-8 shadow-inner border-r border-slate-700 relative scrollbar-thin">
-              {previewUrls.length > 0 ? (
-                <div className="flex flex-col gap-4 items-center">
-                  {previewUrls.map((url, idx) => (
-                    <div key={idx} className="relative shadow-xl ring-1 ring-white/10 group w-full max-w-[520px]">
-                      <img src={url} alt={`Page ${idx + 1}`} className="w-full h-auto" />
-                      <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-white/20 flex items-center gap-1">
-                        <Layers size={12} />
-                        TRANG {idx + 1} {docType === 'SPLIT' && idx === 0 ? '(Trang đầu)' : ''}
-                      </div>
-                    </div>
-                  ))}
-                  {docType === 'SPLIT' && (
-                    <div className="text-slate-400 text-sm italic">
-                      (Chỉ hiển thị trang đầu để tối ưu hiệu năng)
-                    </div>
-                  )}
+              {/* Show JobQueueViewer when processing in SPLIT mode */}
+              {status === ProcessingStatus.ANALYZING && docType === 'SPLIT' && (
+                <div className="w-full max-w-4xl">
+                  <JobQueueViewer onReset={handleReset} />
                 </div>
-              ) : (
-                <div className="text-slate-500 flex flex-col items-center mt-20">
-                  <Eye size={48} className="mb-4 opacity-50" />
-                  <p>Không có bản xem trước</p>
+              )}
+
+              {(status === ProcessingStatus.CONVERTING || status === ProcessingStatus.ANALYZING) && docType !== 'SPLIT' && (
+                <div className="text-center animate-in fade-in zoom-in duration-300 glass-strong p-8 rounded-2xl">
+                  <div className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-6 border-white/30 border-t-white"></div>
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    {status === ProcessingStatus.CONVERTING ? 'Đang đọc tài liệu...' : 'Đang xử lý dữ liệu...'}
+                  </h3>
+                  <p className="text-white/70">
+                    Vishipel TOOL đang phân tích văn bản...
+                  </p>
+                </div>
+              )}
+
+              {status === ProcessingStatus.ERROR && (
+                <div className="max-w-md w-full mt-6 p-6 glass-strong border border-red-400/30 rounded-xl text-center animate-in shake">
+                  <div className="w-12 h-12 bg-red-500/20 text-red-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle size={24} />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">Xử lý thất bại</h3>
+                  <p className="text-white/70 mb-6">{errorMsg}</p>
+                  <button onClick={handleReset} className="px-6 py-2 glass-light hover:bg-white/20 text-white rounded-lg transition-colors font-semibold">
+                    Thử lại
+                  </button>
                 </div>
               )}
             </div>
+          )}
 
-            {/* Right Pane: Document Viewer */}
-            <div className="lg:w-1/2 h-[60vh] lg:h-full overflow-hidden relative bg-slate-200/50 backdrop-blur-sm">
-              {docType === 'INVOICE' && <InvoiceViewer data={reportData as any} />}
-              {docType === 'INCIDENT' && <IncidentViewer data={reportData as any} />}
-              {docType === 'SPLIT' && <SplitterViewer data={reportData as any} />}
+          {/* SUCCESS STATE */}
+          {status === ProcessingStatus.SUCCESS && reportData && (
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden gap-6">
+
+              {/* Left Pane: PDF Preview (Simplified for Splitter, Full for others) */}
+              <div className="lg:w-1/2 h-[40vh] lg:h-full glass-strong overflow-auto p-4 md:p-8 rounded-2xl relative scrollbar-thin">
+                {previewUrls.length > 0 ? (
+                  <div className="flex flex-col gap-4 items-center">
+                    {previewUrls.map((url, idx) => (
+                      <div key={idx} className="relative shadow-xl ring-1 ring-white/20 group w-full max-w-[520px] glass rounded-lg overflow-hidden">
+                        <img src={url} alt={`Page ${idx + 1}`} className="w-full h-auto" />
+                        <div className="absolute top-4 left-4 glass-strong text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-white/30 flex items-center gap-1">
+                          <Layers size={12} />
+                          TRANG {idx + 1} {docType === 'SPLIT' && idx === 0 ? '(Trang đầu)' : ''}
+                        </div>
+                      </div>
+                    ))}
+                    {docType === 'SPLIT' && (
+                      <div className="text-white/60 text-sm italic">
+                        (Chỉ hiển thị trang đầu để tối ưu hiệu năng)
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-white/60 flex flex-col items-center mt-20">
+                    <Eye size={48} className="mb-4 opacity-50" />
+                    <p>Không có bản xem trước</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Pane: Document Viewer */}
+              <div className="lg:w-1/2 h-[60vh] lg:h-full overflow-hidden relative glass-strong rounded-2xl">
+                {docType === 'INVOICE' && <InvoiceViewer data={reportData as any} />}
+                {docType === 'INCIDENT' && <IncidentViewer data={reportData as any} />}
+                {docType === 'SPLIT' && <SplitterViewer data={reportData as any} />}
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      </div>
     </div>
   );
 };

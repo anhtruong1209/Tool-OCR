@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { jobQueue, Job } from '../services/jobQueue';
 import { syncFilesToDestination } from '../services/fileSync';
-import { requestDirectoryPicker } from '../services/fileSaver';
 import { CheckCircle, XCircle, Loader2, Download, Trash2, FileText, Sparkles, Zap, Clock, RefreshCw, FolderSync } from 'lucide-react';
 
 const TIPS = [
@@ -90,29 +89,24 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
     try {
       setSyncingJobs(prev => new Set(prev).add(job.id));
       
-      // Yêu cầu chọn folder đích
-      const destinationHandle = await requestDirectoryPicker();
-      if (!destinationHandle) {
-        throw new Error('Vui lòng chọn folder đích để đồng bộ file.');
+      // Sử dụng folder mặc định (folder lúc đầu) - không yêu cầu chọn folder nữa
+      if (!job.rootDirHandle) {
+        throw new Error('Không tìm thấy folder đích. Vui lòng thử lại.');
       }
 
-      // Đồng bộ file từ TEMP_EXTRACT vào folder đích
+      // Đồng bộ file từ TEMP_EXTRACT vào folder đích (dùng chính folder rootDirHandle)
       const result = await syncFilesToDestination(
         job.rootDirHandle,
         job.file.name,
-        destinationHandle
+        job.rootDirHandle
       );
 
       if (result.failed > 0) {
         alert(`Đồng bộ hoàn tất với một số lỗi:\n- Thành công: ${result.success} file\n- Thất bại: ${result.failed} file\n\nLỗi:\n${result.errors.join('\n')}`);
       } else {
-        alert(`Đồng bộ thành công ${result.success} file vào folder "${destinationHandle.name}"!`);
+        alert(`Đồng bộ thành công ${result.success} file vào folder "${job.rootDirHandle.name}"!`);
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        // User cancelled folder picker
-        return;
-      }
       console.error('[JobQueueViewer] Error syncing files:', error);
       alert(`Lỗi khi đồng bộ file: ${error.message}`);
     } finally {
@@ -151,7 +145,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
       case 'error':
         return <XCircle className="w-5 h-5 text-red-500" />;
       case 'processing':
-        return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
+        return <Loader2 className="w-5 h-5 text-orange-500 animate-spin" />;
       default:
         return <FileText className="w-5 h-5 text-slate-400" />;
     }
@@ -184,11 +178,11 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
   // Show empty state if no jobs
   if (jobs.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 mb-6">
+      <div className="glass-strong rounded-xl p-6 mb-6 border border-white/20">
         <div className="text-center py-8">
-          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500 font-medium">Chưa có file nào được thêm vào</p>
-          <p className="text-sm text-slate-400 mt-1">Kéo thả hoặc chọn file PDF để bắt đầu</p>
+          <FileText className="w-12 h-12 text-white/40 mx-auto mb-3" />
+          <p className="text-white/80 font-medium">Chưa có file nào được thêm vào</p>
+          <p className="text-sm text-white/60 mt-1">Kéo thả hoặc chọn file PDF để bắt đầu</p>
         </div>
       </div>
     );
@@ -197,54 +191,54 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
   return (
     <div className="space-y-4 mb-6">
       {/* File List - Show all files immediately */}
-      <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
+      <div className="glass-strong rounded-xl p-6 border border-white/20">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-800">Danh sách file</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className="text-lg font-bold text-white">Danh sách file</h3>
+            <p className="text-sm text-white/70">
               Tổng: {jobs.length} file • {completedCount} hoàn thành • {processingCount} đang xử lý • {pendingCount} chờ
             </p>
           </div>
           {processingJob && (
-            <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
-              <Clock className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-bold text-blue-700">{formatTimer(elapsedTime)}</span>
+            <div className="flex items-center gap-2 glass bg-white/20 px-4 py-2 rounded-lg border border-white/30">
+              <Clock className="w-4 h-4 text-white" />
+              <span className="text-sm font-bold text-white">{formatTimer(elapsedTime)}</span>
             </div>
           )}
         </div>
 
-        <div className="space-y-2 max-h-[500px] overflow-y-auto">
+        <div className="space-y-2 max-h-[500px] overflow-y-auto scrollbar-thin">
           {jobs.map((job, index) => (
             <div
               key={job.id}
               className={`p-4 rounded-lg border-2 transition-all ${
                 job.status === 'completed'
-                  ? 'border-green-200 bg-green-50'
+                  ? 'border-green-400/30 bg-green-500/20 glass-light'
                   : job.status === 'error'
-                  ? 'border-red-200 bg-red-50'
+                  ? 'border-red-400/30 bg-red-500/20 glass-light'
                   : job.status === 'processing'
-                  ? 'border-blue-200 bg-blue-50'
-                  : 'border-slate-200 bg-slate-50'
+                  ? 'border-orange-400/30 bg-orange-500/20 glass-light'
+                  : 'border-white/20 bg-white/5 glass-light'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded">
+                    <span className="text-xs font-bold text-white/60 glass bg-white/10 px-2 py-1 rounded border border-white/20">
                       #{index + 1}
                     </span>
                     {getStatusIcon(job.status)}
-                    <span className="font-semibold text-slate-800 truncate flex-1">
+                    <span className="font-semibold text-white truncate flex-1">
                       {job.file.name}
                     </span>
                     {job.status === 'processing' && (
-                      <span className="text-xs bg-blue-200 text-blue-700 px-2 py-1 rounded-full font-semibold shrink-0">
+                      <span className="text-xs glass bg-white/20 text-white px-2 py-1 rounded-full font-semibold shrink-0 border border-white/30">
                         {job.progress}%
                       </span>
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-4 text-xs text-slate-600 mb-2">
+                  <div className="flex items-center gap-4 text-xs text-white/70 mb-2">
                     <span className="font-medium">{getStatusText(job.status)}</span>
                     {job.startTime && job.status === 'processing' && (
                       <span className="flex items-center gap-1">
@@ -253,34 +247,34 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                       </span>
                     )}
                     {job.endTime && job.startTime && (
-                      <span className="text-green-600">
+                      <span className="text-green-300">
                         Hoàn thành sau {formatTimer(Math.floor((job.endTime - job.startTime) / 1000))}
                       </span>
                     )}
                   </div>
 
                   {job.error && (
-                    <p className="text-xs text-red-600 mt-1">{job.error}</p>
+                    <p className="text-xs text-red-300 mt-1">{job.error}</p>
                   )}
 
                   {job.status === 'processing' && (
-                    <div className="mt-2 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div className="mt-2 w-full glass bg-white/10 rounded-full h-2 overflow-hidden border border-white/20">
                       <div
-                        className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
+                        className="bg-gradient-to-r from-blue-500 to-orange-500 h-full rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${job.progress}%` }}
                       />
                     </div>
                   )}
 
                   {job.status === 'pending' && (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                    <div className="mt-2 flex items-center gap-2 text-xs text-white/60">
                       <Clock className="w-3 h-3" />
                       <span>Đang chờ đến lượt...</span>
                     </div>
                   )}
 
                   {job.status === 'completed' && job.result?.documents && (
-                    <div className="mt-2 text-xs text-green-600 font-medium">
+                    <div className="mt-2 text-xs text-green-300 font-medium">
                       ✓ Đã tách thành {job.result.documents.length} file
                     </div>
                   )}
@@ -292,7 +286,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                       {job.result?.zipBlob && (
                         <button
                           onClick={() => handleDownload(job)}
-                          className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm"
+                          className="px-4 py-2 glass bg-green-500/30 hover:bg-green-500/40 text-white rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border border-green-400/30"
                           title="Tải xuống"
                         >
                           <Download className="w-4 h-4" />
@@ -302,10 +296,10 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                       <button
                         onClick={() => handleSyncToFolder(job)}
                         disabled={syncingJobs.has(job.id)}
-                        className={`px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm ${
+                        className={`px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border ${
                           syncingJobs.has(job.id)
-                            ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600'
+                            ? 'glass-light bg-white/10 text-white/50 cursor-not-allowed border-white/10'
+                            : 'glass bg-orange-500/30 hover:bg-orange-500/40 text-white border-orange-400/30'
                         }`}
                         title="Đồng bộ vào folder"
                       >
@@ -325,7 +319,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                   )}
                   <button
                     onClick={() => handleRemove(job.id)}
-                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-white/50 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors border border-transparent hover:border-red-400/30"
                     title="Xóa"
                   >
                     <XCircle className="w-5 h-5" />
@@ -339,12 +333,12 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
 
       {/* Processing Status with Tips */}
       {processingJob && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg border-2 border-blue-200 p-4">
+        <div className="glass-strong rounded-xl border-2 border-orange-400/30 p-4">
           <div className="flex items-center gap-3">
-            <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+            <Loader2 className="w-6 h-6 text-white animate-spin" />
             <div className="flex-1">
-              <div className="flex items-center gap-2 text-sm text-slate-700">
-                <Sparkles className="w-4 h-4 text-yellow-500 animate-pulse" />
+              <div className="flex items-center gap-2 text-sm text-white">
+                <Sparkles className="w-4 h-4 text-orange-300 animate-pulse" />
                 <span className="animate-in fade-in duration-500">{TIPS[currentTip]}</span>
               </div>
             </div>
@@ -357,7 +351,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
         {completedCount + errorCount > 0 && (
           <button
             onClick={handleClearCompleted}
-            className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors bg-white"
+            className="text-sm text-white/70 hover:text-white flex items-center gap-2 px-4 py-2 rounded-lg glass-light hover:bg-white/10 transition-colors border border-white/20"
           >
             <Trash2 className="w-4 h-4" />
             Xóa đã hoàn thành
@@ -366,7 +360,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
         {jobs.length > 0 && (
           <button
             onClick={handleReset}
-            className="text-sm text-white bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 flex items-center gap-2 px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-semibold"
+            className="text-sm text-white glass bg-orange-500/30 hover:bg-orange-500/40 flex items-center gap-2 px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-semibold border border-orange-400/30"
           >
             <RefreshCw className="w-4 h-4" />
             Tải lại / Upload mới

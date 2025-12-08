@@ -2,10 +2,10 @@
   "originalFileName": "3897-2025-VIS-BIENS.pdf",
   "broadcastCode": "MET",
   "serviceCode": "NTX",
-  "generatedAt": "2025-12-05T09:24:43.269Z",
+  "generatedAt": "2025-12-08T02:58:09.085Z",
   "documents": [
     {
-      "id": "ghqy9dlf7",
+      "id": "nx6wtuowh",
       "filename": "3897-2025-VIS-BIENS - QT.MSI-BM.01.pdf",
       "code": "QT.MSI-BM.01",
       "serviceCode": "RTP",
@@ -15,7 +15,7 @@
       "recommendedPath": "COVER/COVER/MET"
     },
     {
-      "id": "z24ojsp6x",
+      "id": "7zx90zonw",
       "filename": "3897-2025-VIS-BIENS - KTKS.MSI.TC-BM.01.pdf",
       "code": "KTKS.MSI.TC-BM.01",
       "serviceCode": "RTP",
@@ -25,7 +25,7 @@
       "recommendedPath": "COVER/KTKSTC BM 01/MET"
     },
     {
-      "id": "u9jlw0y4a",
+      "id": "gc0p3s2vw",
       "filename": "3897-2025-VIS-BIENS.pdf",
       "code": null,
       "serviceCode": "RTP",
@@ -35,17 +35,17 @@
       "recommendedPath": "BAN TIN NGUON/MET"
     },
     {
-      "id": "qw3rtietj",
+      "id": "wgwok41np",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "serviceCode": "RTP",
       "startPage": 6,
       "endPage": 7,
       "pageCount": 2,
-      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/MET"
+      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "nnyj2zq0v",
+      "id": "3nz4f3kh9",
       "filename": "3897-2025-VIS-BIENS - RTP - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "serviceCode": "RTP",
@@ -55,7 +55,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "4wa345vi6",
+      "id": "nlgr5q1jc",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "serviceCode": "RTP",
@@ -65,7 +65,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "d9936gz5x",
+      "id": "nrwf3z1w3",
       "filename": "3897-2025-VIS-BIENS - RTP - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "serviceCode": "RTP",
@@ -75,7 +75,7 @@
       "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "722h8ojst",
+      "id": "lzwpvbvld",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "RTP",
@@ -85,7 +85,7 @@
       "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/MET"
     },
     {
-      "id": "x2o1xt7uu",
+      "id": "5pf9wbpn4",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "RTP",
@@ -95,17 +95,17 @@
       "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/MET"
     },
     {
-      "id": "hxjcqb4ly",
+      "id": "tdm5mhnli",
       "filename": "3897-2025-VIS-BIENS - NTX - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "serviceCode": "NTX",
       "startPage": 16,
       "endPage": 18,
       "pageCount": 3,
-      "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/MET"
+      "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "oxx7jqrk7",
+      "id": "ll7j58d1x",
       "filename": "3897-2025-VIS-BIENS - NTX - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "serviceCode": "NTX",
@@ -115,7 +115,7 @@
       "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/MET"
     },
     {
-      "id": "m3vk7ylrt",
+      "id": "uq7mp3b8r",
       "filename": "3897-2025-VIS-BIENS - NTX - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "serviceCode": "NTX",
@@ -125,7 +125,7 @@
       "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "uxleyste5",
+      "id": "lkp53c5ch",
       "filename": "3897-2025-VIS-BIENS - NTX - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "serviceCode": "NTX",
@@ -135,7 +135,7 @@
       "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/MET"
     },
     {
-      "id": "tf0riq48p",
+      "id": "kb46gi3h5",
       "filename": "3897-2025-VIS-BIENS - NTX - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "NTX",
