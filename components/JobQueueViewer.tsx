@@ -181,8 +181,8 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
       <div className="glass-strong rounded-xl p-6 mb-6 border border-white/20">
         <div className="text-center py-8">
           <FileText className="w-12 h-12 text-white/40 mx-auto mb-3" />
-          <p className="text-white/80 font-medium">Chưa có file nào được thêm vào</p>
-          <p className="text-sm text-white/60 mt-1">Kéo thả hoặc chọn file PDF để bắt đầu</p>
+          <p className="text-slate-900/80 font-medium">Chưa có file nào được thêm vào</p>
+          <p className="text-sm text-dark/60 mt-1">Kéo thả hoặc chọn file PDF để bắt đầu</p>
         </div>
       </div>
     );
@@ -194,15 +194,15 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
       <div className="glass-strong rounded-xl p-6 border border-white/20">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-bold text-white">Danh sách file</h3>
-            <p className="text-sm text-white/70">
+            <h3 className="text-lg font-bold text-dark">Danh sách file</h3>
+            <p className="text-sm text-dark/70">
               Tổng: {jobs.length} file • {completedCount} hoàn thành • {processingCount} đang xử lý • {pendingCount} chờ
             </p>
           </div>
           {processingJob && (
-            <div className="flex items-center gap-2 glass bg-white/20 px-4 py-2 rounded-lg border border-white/30">
-              <Clock className="w-4 h-4 text-white" />
-              <span className="text-sm font-bold text-white">{formatTimer(elapsedTime)}</span>
+            <div className="flex items-center gap-2 glass bg-dark/20 px-4 py-2 rounded-lg border border-dark/30">
+              <Clock className="w-4 h-4 text-dark" />
+              <span className="text-sm font-bold text-dark">{formatTimer(elapsedTime)}</span>
             </div>
           )}
         </div>
@@ -218,27 +218,27 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                   ? 'border-red-400/30 bg-red-500/20 glass-light'
                   : job.status === 'processing'
                   ? 'border-orange-400/30 bg-orange-500/20 glass-light'
-                  : 'border-white/20 bg-white/5 glass-light'
+                  : 'border-dark/20 bg-dark/5 glass-light'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-xs font-bold text-white/60 glass bg-white/10 px-2 py-1 rounded border border-white/20">
+                    <span className="text-xs font-bold text-dark/60 glass bg-dark/10 px-2 py-1 rounded border border-dark/20">
                       #{index + 1}
                     </span>
                     {getStatusIcon(job.status)}
-                    <span className="font-semibold text-white truncate flex-1">
+                    <span className="font-semibold text-dark truncate flex-1">
                       {job.file.name}
                     </span>
                     {job.status === 'processing' && (
-                      <span className="text-xs glass bg-white/20 text-white px-2 py-1 rounded-full font-semibold shrink-0 border border-white/30">
+                      <span className="text-xs glass bg-dark/20 text-dark px-2 py-1 rounded-full font-semibold shrink-0 border border-dark/30">
                         {job.progress}%
                       </span>
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-4 text-xs text-white/70 mb-2">
+                  <div className="flex items-center gap-4 text-xs text-dark/70 mb-2">
                     <span className="font-medium">{getStatusText(job.status)}</span>
                     {job.startTime && job.status === 'processing' && (
                       <span className="flex items-center gap-1">
@@ -247,18 +247,18 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                       </span>
                     )}
                     {job.endTime && job.startTime && (
-                      <span className="text-green-300">
+                      <span className="text-dark">
                         Hoàn thành sau {formatTimer(Math.floor((job.endTime - job.startTime) / 1000))}
                       </span>
                     )}
                   </div>
 
                   {job.error && (
-                    <p className="text-xs text-red-300 mt-1">{job.error}</p>
+                    <p className="text-xs text-dark mt-1">{job.error}</p>
                   )}
 
                   {job.status === 'processing' && (
-                    <div className="mt-2 w-full glass bg-white/10 rounded-full h-2 overflow-hidden border border-white/20">
+                    <div className="mt-2 w-full glass bg-dark/10 rounded-full h-2 overflow-hidden border border-dark/20">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-orange-500 h-full rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${job.progress}%` }}
@@ -267,14 +267,14 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                   )}
 
                   {job.status === 'pending' && (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-white/60">
+                    <div className="mt-2 flex items-center gap-2 text-xs text-dark/60">
                       <Clock className="w-3 h-3" />
                       <span>Đang chờ đến lượt...</span>
                     </div>
                   )}
 
                   {job.status === 'completed' && job.result?.documents && (
-                    <div className="mt-2 text-xs text-green-300 font-medium">
+                    <div className="mt-2 text-xs text-dark font-medium">
                       ✓ Đã tách thành {job.result.documents.length} file
                     </div>
                   )}
@@ -286,7 +286,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                       {job.result?.zipBlob && (
                         <button
                           onClick={() => handleDownload(job)}
-                          className="px-4 py-2 glass bg-green-500/30 hover:bg-green-500/40 text-white rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border border-green-400/30"
+                          className="px-4 py-2 glass bg-dark/30 hover:bg-dark/40 text-dark rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border border-dark/30"
                           title="Tải xuống"
                         >
                           <Download className="w-4 h-4" />
@@ -298,8 +298,8 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                         disabled={syncingJobs.has(job.id)}
                         className={`px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center gap-2 font-semibold text-sm border ${
                           syncingJobs.has(job.id)
-                            ? 'glass-light bg-white/10 text-white/50 cursor-not-allowed border-white/10'
-                            : 'glass bg-orange-500/30 hover:bg-orange-500/40 text-white border-orange-400/30'
+                            ? 'glass-light bg-dark/10 text-dark/50 cursor-not-allowed border-dark/10'
+                            : 'glass bg-dark/30 hover:bg-dark/40 text-dark border-dark/30'
                         }`}
                         title="Đồng bộ vào folder"
                       >
@@ -319,7 +319,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
                   )}
                   <button
                     onClick={() => handleRemove(job.id)}
-                    className="p-2 text-white/50 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors border border-transparent hover:border-red-400/30"
+                    className="p-2 text-dark/50 hover:text-dark hover:bg-dark/20 rounded-lg transition-colors border border-transparent hover:border-dark/30"
                     title="Xóa"
                   >
                     <XCircle className="w-5 h-5" />
@@ -335,9 +335,9 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
       {processingJob && (
         <div className="glass-strong rounded-xl border-2 border-orange-400/30 p-4">
           <div className="flex items-center gap-3">
-            <Loader2 className="w-6 h-6 text-white animate-spin" />
+            <Loader2 className="w-6 h-6 text-dark animate-spin" />
             <div className="flex-1">
-              <div className="flex items-center gap-2 text-sm text-white">
+              <div className="flex items-center gap-2 text-sm text-dark">
                 <Sparkles className="w-4 h-4 text-orange-300 animate-pulse" />
                 <span className="animate-in fade-in duration-500">{TIPS[currentTip]}</span>
               </div>
@@ -351,7 +351,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
         {completedCount + errorCount > 0 && (
           <button
             onClick={handleClearCompleted}
-            className="text-sm text-white/70 hover:text-white flex items-center gap-2 px-4 py-2 rounded-lg glass-light hover:bg-white/10 transition-colors border border-white/20"
+            className="text-sm text-dark/70 hover:text-dark flex items-center gap-2 px-4 py-2 rounded-lg glass-light hover:bg-dark/10 transition-colors border border-dark/20"
           >
             <Trash2 className="w-4 h-4" />
             Xóa đã hoàn thành
@@ -360,7 +360,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
         {jobs.length > 0 && (
           <button
             onClick={handleReset}
-            className="text-sm text-white glass bg-orange-500/30 hover:bg-orange-500/40 flex items-center gap-2 px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-semibold border border-orange-400/30"
+              className="text-sm text-dark glass bg-dark/30 hover:bg-dark/40 flex items-center gap-2 px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-semibold border border-dark/30"
           >
             <RefreshCw className="w-4 h-4" />
             Tải lại / Upload mới

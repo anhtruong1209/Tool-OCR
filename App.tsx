@@ -8,10 +8,11 @@ import { InvoiceViewer } from './components/InvoiceViewer';
 import { IncidentViewer } from './components/IncidentViewer';
 import { SplitterViewer } from './components/SplitterViewer';
 import { JobQueueViewer } from './components/JobQueueViewer';
+import { DocumentationViewer } from './components/DocumentationViewer';
 import { DocumentData, ProcessingStatus, DocumentType } from './types';
 import { jobQueue } from './services/jobQueue';
 import { requestDirectoryPicker } from './services/fileSaver';
-import { AlertCircle, BrainCircuit, Eye, FileText, Anchor, Layers, Scissors, FolderOpen, ShieldCheck } from 'lucide-react';
+import { AlertCircle, BrainCircuit, Eye, FileText, Anchor, Layers, Scissors, FolderOpen, ShieldCheck, BookOpen } from 'lucide-react';
 
 type HandlePermissionState = 'prompt' | 'granted' | 'denied';
 
@@ -52,6 +53,7 @@ const requestDirPermission = async (handle: FileSystemDirectoryHandle): Promise<
 const App: React.FC = () => {
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [docType, setDocType] = useState<DocumentType>('SPLIT');
+  const [showDocs, setShowDocs] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [reportData, setReportData] = useState<DocumentData | null>(null);
@@ -221,16 +223,31 @@ const App: React.FC = () => {
           <button
             onClick={() => {
               setDocType('SPLIT');
+              setShowDocs(false);
               if (status === ProcessingStatus.SUCCESS) handleReset();
             }}
             className={`w-full px-4 py-3 rounded-xl text-left transition-all flex items-center gap-3 ${
-              docType === 'SPLIT'
-                ? 'glass bg-white/20 text-white font-semibold'
-                : 'glass-light text-white/70 hover:text-white hover:bg-white/10'
+              !showDocs && docType === 'SPLIT'
+                ? 'glass bg-white/20 text-dark font-semibold border border-orange-400/30'
+                : 'glass-light text-dark/70 hover:text-dark hover:bg-dark/10'
             }`}
           >
             <Scissors size={20} />
             <span>Tách PDF</span>
+          </button>
+          <button
+            onClick={() => {
+              setShowDocs(true);
+              handleReset();
+            }}
+            className={`w-full px-4 py-3 rounded-xl text-left transition-all flex items-center gap-3 ${
+              showDocs
+                ? 'glass bg-white/20 text-dark font-semibold border border-orange-400/30'
+                : 'glass-light text-dark/70 hover:text-dark hover:bg-dark/10'
+            }`}
+          >
+            <BookOpen size={20} />
+            <span>Hướng Dẫn</span>
           </button>
         </nav>
 
@@ -245,11 +262,14 @@ const App: React.FC = () => {
 
       {/* Main Content - Right */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
-
+        {showDocs ? (
+          <DocumentationViewer />
+        ) : (
+          <>
         {/* Top Bar */}
-        <header className="glass border-b border-white/20 h-16 shrink-0 z-30 flex items-center justify-between px-6">
+        <header className="glass border-b border-slate-200 h-16 shrink-0 z-30 flex items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold text-white">
+            <h2 className="text-lg font-bold text-slate-800">
               {docType === 'SPLIT' && 'Bộ Tách PDF Tự Động'}
               {docType === 'INVOICE' && 'Xử lý Hóa đơn GTGT'}
               {docType === 'INCIDENT' && 'Xử lý Báo cáo Sự cố'}
@@ -259,15 +279,15 @@ const App: React.FC = () => {
           {status === ProcessingStatus.SUCCESS && (
             <button
               onClick={handleReset}
-              className="glass-light hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-all text-sm font-semibold"
+              className="glass-light hover:bg-blue-50 text-blue-700 px-4 py-2 rounded-lg transition-all text-sm font-semibold border border-blue-200"
             >
               Upload file mới
             </button>
           )}
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-hidden relative z-10 p-6">
+            {/* Main Content */}
+            <main className="flex-1 flex flex-col overflow-hidden relative z-10 p-6">
 
           {/* IDLE & PROCESSING STATES */}
           {status !== ProcessingStatus.SUCCESS && (
@@ -277,44 +297,44 @@ const App: React.FC = () => {
                 <div className="w-full max-w-5xl mx-auto space-y-6">
                   <section className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700 glass-strong p-8 md:p-10 rounded-3xl">
                     <div className="mx-auto max-w-2xl">
-                      <p className="text-xs uppercase tracking-[0.5em] text-white/60 mb-3 font-semibold">Vishipel TOOL</p>
-                      <h2 className="text-3xl md:text-4xl font-black text-white mb-3 tracking-tight">
+                      <p className="text-xs uppercase tracking-[0.5em] text-slate-500 mb-3 font-semibold">Vishipel TOOL</p>
+                      <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-3 tracking-tight">
                         Bộ Tách PDF Tự Động (Đài TTDH Đà Nẵng)
                       </h2>
-                      <p className="text-white/80 mb-6 text-base">
+                      <p className="text-slate-700 mb-6 text-base">
                         Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo cấu trúc nghiệp vụ.
                       </p>
                     </div>
                   </section>
 
                   <section className="grid gap-6 lg:grid-cols-2 items-start">
-                    <div className="glass-strong rounded-2xl p-6 flex flex-col gap-4 transition-all hover:bg-white/20">
+                    <div className="glass-strong rounded-2xl p-6 flex flex-col gap-4 transition-all hover:shadow-lg border border-slate-200">
                       <div className="flex flex-col gap-2 text-left">
-                        <p className="text-xs uppercase tracking-[0.3em] text-white/60 font-semibold">Bước 1</p>
-                        <h3 className="text-xl font-bold text-white">Chọn thư mục lưu kết quả</h3>
-                        <p className="text-sm text-white/70">Chọn thư mục đích trước khi tải file PDF lên.</p>
+                        <p className="text-xs uppercase tracking-[0.3em] text-slate-500 font-semibold">Bước 1</p>
+                        <h3 className="text-xl font-bold text-slate-900">Chọn thư mục lưu kết quả</h3>
+                        <p className="text-sm text-slate-600">Chọn thư mục đích trước khi tải file PDF lên.</p>
                       </div>
                       <button
                         onClick={handleSelectDestinationFolder}
-                        className="w-full px-5 py-3 bg-gradient-to-r from-blue-500/30 to-orange-500/30 hover:from-blue-500/40 hover:to-orange-500/40 text-white rounded-xl font-semibold transition-all shadow-lg hover:scale-105 flex items-center justify-center gap-3 text-sm border border-orange-400/30"
+                        className="w-full px-5 py-3 bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:scale-105 flex items-center justify-center gap-3 text-sm"
                       >
                         <FolderOpen size={20} />
                         {directoryInfo ? `Đã chọn: ${directoryInfo.name}` : 'Chọn thư mục lưu file'}
                       </button>
                       {directoryInfo && (
-                        <div className="text-sm text-green-300 bg-green-500/20 border border-green-400/30 rounded-lg p-3 glass-light">
+                        <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
                           ✓ Thư mục "{directoryInfo.name}" đã được chọn. Bạn có thể upload file PDF bên dưới.
                         </div>
                       )}
                     </div>
 
-                    <div className="glass-strong rounded-2xl p-6 flex flex-col gap-4 transition-all hover:bg-white/20">
+                    <div className="glass-strong rounded-2xl p-6 flex flex-col gap-4 transition-all hover:shadow-lg border border-slate-200">
                       <div className="flex flex-col gap-2 text-left">
-                        <p className="text-xs uppercase tracking-[0.3em] text-white/60 font-semibold">Bước 2</p>
-                        <h3 className="text-xl font-bold text-white">Tải lên file PDF</h3>
-                        <p className="text-sm text-white/70">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
+                        <p className="text-xs uppercase tracking-[0.3em] text-slate-500 font-semibold">Bước 2</p>
+                        <h3 className="text-xl font-bold text-slate-900">Tải lên file PDF</h3>
+                        <p className="text-sm text-slate-600">Hỗ trợ kéo thả hoặc chọn từ máy tính (tối đa 10MB cho mỗi file).</p>
                       </div>
-                      <div className="glass-light rounded-2xl p-4 border border-white/20">
+                      <div className="glass-light rounded-2xl p-4 border border-slate-200">
                         <UploadArea
                           onFileSelect={handleFileSelect}
                           onMultipleFilesSelect={handleMultipleFilesSelect}
@@ -322,8 +342,8 @@ const App: React.FC = () => {
                           disabled={docType === 'SPLIT' && !directoryInfo}
                         />
                       </div>
-                      <div className="text-xs text-white/60 flex items-center gap-2">
-                        <span className="inline-flex w-2 h-2 rounded-full bg-white/40"></span>
+                      <div className="text-xs text-slate-600 flex items-center gap-2">
+                        <span className="inline-flex w-2 h-2 rounded-full bg-blue-500"></span>
                         {directoryInfo
                           ? 'Sẵn sàng nhận file PDF – chọn file để bắt đầu tách.'
                           : 'Vui lòng chọn thư mục lưu kết quả trước khi upload file.'}
@@ -413,6 +433,8 @@ const App: React.FC = () => {
             </div>
           )}
         </main>
+          </>
+        )}
       </div>
     </div>
   );
