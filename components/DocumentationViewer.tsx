@@ -439,40 +439,43 @@ const OverviewSection: React.FC = () => {
                 </div>
               )}
 
-              {/* Row 2: Ảnh 4 -> Ảnh 5 -> Ảnh 6 */}
+              {/* Row 2: Ảnh 6 -> Ảnh 5 -> Ảnh 4 (theo yêu cầu 654) */}
               {resultImages.length > 3 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-                  {resultImages.slice(3, 6).map((img, idx) => (
-                    <div key={idx + 3} className="relative">
-                      {/* Arrow pointing left (except first item) */}
-                      {idx > 0 && (
-                        <div className="absolute -left-6 top-1/2 transform -translate-y-1/2 z-10 hidden md:block">
-                          <div className="p-2 glass bg-white/80 rounded-full border border-slate-300 shadow-md">
-                            <ArrowRight className="w-6 h-6 text-cyan-600 rotate-180" />
+                  {[5, 4, 3].filter(i => i < resultImages.length).map((realIdx, posIdx) => {
+                    const img = resultImages[realIdx];
+                    return (
+                      <div key={realIdx} className="relative">
+                        {/* Arrow between items (trái sang phải) */}
+                        {posIdx > 0 && (
+                          <div className="absolute -left-6 top-1/2 transform -translate-y-1/2 z-10 hidden md:block">
+                            <div className="p-2 glass bg-white/80 rounded-full border border-slate-300 shadow-md">
+                              <ArrowRight className="w-6 h-6 text-cyan-600 rotate-180" />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {/* Arrow pointing down (for mobile) */}
-                      {idx < 2 && idx + 3 < resultImages.length - 1 && (
-                        <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 z-10 md:hidden">
-                          <div className="p-2 glass bg-white/80 rounded-full border border-slate-300 shadow-md">
-                            <ArrowRight className="w-6 h-6 text-cyan-600 rotate-90" />
+                        )}
+                        {/* Arrow down (mobile) */}
+                        {posIdx < 2 && posIdx < resultImages.length - 4 && (
+                          <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 z-10 md:hidden">
+                            <div className="p-2 glass bg-white/80 rounded-full border border-slate-300 shadow-md">
+                              <ArrowRight className="w-6 h-6 text-cyan-600 rotate-90" />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      
-                      <div className="glass-light rounded-lg overflow-hidden border-2 border-slate-300 hover:border-cyan-400 hover:shadow-xl transition-all">
-                        <img 
-                          src={img} 
-                          alt={`Kết quả ${idx + 4}`}
-                          className="w-full h-auto object-contain bg-white"
-                        />
-                        <div className="p-3 bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 text-center border-t border-slate-200">
-                          <p className="text-sm font-bold text-slate-800">Kết quả {idx + 4}</p>
+                        )}
+                        
+                        <div className="glass-light rounded-lg overflow-hidden border-2 border-slate-300 hover:border-cyan-400 hover:shadow-xl transition-all">
+                          <img 
+                            src={img} 
+                            alt={`Kết quả ${realIdx + 1}`}
+                            className="w-full h-auto object-contain bg-white"
+                          />
+                          <div className="p-3 bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 text-center border-t border-slate-200">
+                            <p className="text-sm font-bold text-slate-800">Kết quả {realIdx + 1}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
