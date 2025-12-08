@@ -208,6 +208,10 @@ export const splitPdfByKeywords = async (
     const classifyPage = (idx: number): PageType => {
       const p = analysis.pages.find(pp => pp.page === idx);
       if (!p) return 'CONTENT';
+
+      // Nếu Gemini gán FORM_HEADER nhưng không có formCode, coi như CONTENT để tránh cắt sai
+      if (p.type === 'FORM_HEADER' && !p.formCode) return 'CONTENT';
+
       if (p.type) return p.type as any;
       if (p.isLogPage) return 'LOG_SCREEN';
       if (p.formCode) return 'FORM_HEADER';
@@ -281,9 +285,19 @@ export const splitPdfByKeywords = async (
       }
 
       // Breakpoints
+      const formCode = pageInfo?.formCode || null;
+      const isFormHeader = pageType === 'FORM_HEADER' && !!formCode;
+      const isNewFormHeader =
+        isFormHeader &&
+        (
+          currentDocPages.length === 0 ||
+          !currentDocFormCode ||
+          formCode !== currentDocFormCode
+        );
+
       const isBreakpoint =
         pageType === 'LOG_SCREEN' ||
-        pageType === 'FORM_HEADER' ||
+        isNewFormHeader ||
         (pageType === 'SOURCE_HEADER' && classifyPage(pageNum - 1) === 'FORM_HEADER');
 
       // If breakpoint and we already have pages → flush before starting new
@@ -300,7 +314,7 @@ export const splitPdfByKeywords = async (
       // Start new doc if breakpoint
       if (isBreakpoint || currentDocPages.length === 0) {
         currentDocPages = [];
-        currentDocFormCode = pageInfo?.formCode || null;
+        currentDocFormCode = formCode || null;
         currentDocService = getServiceFromPage(pageInfo) || currentServiceState || null;
       }
 

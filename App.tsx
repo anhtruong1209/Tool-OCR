@@ -299,7 +299,7 @@ const App: React.FC = () => {
                     <div className="mx-auto max-w-2xl">
                       <p className="text-xs uppercase tracking-[0.5em] text-slate-500 mb-3 font-semibold">Vishipel TOOL</p>
                       <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-3 tracking-tight">
-                        Bộ Tách PDF Tự Động (Đài TTDH Đà Nẵng)
+                        Bộ Tách PDF Tự Động <br></br>(Đài TTDH Đà Nẵng)
                       </h2>
                       <p className="text-slate-700 mb-6 text-base">
                         Kéo thả các file PDF nguồn, chọn thư mục lưu và để hệ thống tự động cắt nhỏ theo cấu trúc nghiệp vụ.

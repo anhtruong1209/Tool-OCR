@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, FileText, Code, Zap, Database, Settings, Layers, Brain, Image, FolderTree, ArrowRight, CheckCircle, AlertCircle, Info, FolderOpen } from 'lucide-react';
-import { requestDirectoryPicker, getOrCreateDirectory } from '../services/fileSaver';
+import { BookOpen, FileText, Code, Zap, Database, Settings, Layers, Brain, Image, FolderTree, ArrowRight, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -200,263 +199,56 @@ export const DocumentationViewer: React.FC = () => {
 // ============ SECTION COMPONENTS ============
 
 const OverviewSection: React.FC = () => {
-  const [rootDirHandle, setRootDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [overviewImage, setOverviewImage] = useState<string>('');
   const [resultImages, setResultImages] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  // Load ảnh từ public/docs-images/ (sử dụng public URL)
+  // Load ảnh từ DOCS_IMAGES (file cứng)
   useEffect(() => {
-    // Thử load từ public URL trước (khi đã deploy)
-    const loadFromPublic = () => {
-      // Overview image
-      const overviewImg = document.createElement('img');
-      overviewImg.onload = () => setOverviewImage('/docs-images/overview-image.jpg');
-      overviewImg.onerror = () => {
-        // Nếu không có trong public, thử load từ thư mục local
-        loadFromLocal();
+    // Load overview image
+    const overviewImg = document.createElement('img');
+    overviewImg.onload = () => setOverviewImage('/DOCS_IMAGES/overview-image.jpg');
+    overviewImg.onerror = () => {
+      // Thử với extension khác
+      const overviewImg2 = document.createElement('img');
+      overviewImg2.onload = () => setOverviewImage('/DOCS_IMAGES/overview-image.png');
+      overviewImg2.onerror = () => {};
+      overviewImg2.src = '/DOCS_IMAGES/overview-image.png';
+    };
+    overviewImg.src = '/DOCS_IMAGES/overview-image.jpg';
+
+    // Load result images
+    const resultUrls: string[] = [];
+    let loadedCount = 0;
+    for (let i = 1; i <= 6; i++) {
+      const img = document.createElement('img');
+      img.onload = () => {
+        resultUrls[i - 1] = `/DOCS_IMAGES/result-${i}.jpg`;
+        loadedCount++;
+        if (loadedCount === 6) {
+          setResultImages(resultUrls.filter(Boolean));
+        }
       };
-      overviewImg.src = '/docs-images/overview-image.jpg';
-
-      // Result images
-      const resultUrls: string[] = [];
-      let loadedCount = 0;
-      for (let i = 1; i <= 6; i++) {
-        const img = document.createElement('img');
-        img.onload = () => {
-          resultUrls[i - 1] = `/docs-images/result-${i}.jpg`;
+      img.onerror = () => {
+        // Thử với extension khác
+        const img2 = document.createElement('img');
+        img2.onload = () => {
+          resultUrls[i - 1] = `/DOCS_IMAGES/result-${i}.png`;
           loadedCount++;
           if (loadedCount === 6) {
             setResultImages(resultUrls.filter(Boolean));
           }
         };
-        img.onerror = () => {
+        img2.onerror = () => {
           loadedCount++;
           if (loadedCount === 6) {
             setResultImages(resultUrls.filter(Boolean));
-            // Nếu không có trong public, thử load từ local
-            if (resultUrls.filter(Boolean).length === 0) {
-              loadFromLocal();
-            }
           }
         };
-        img.src = `/docs-images/result-${i}.jpg`;
-      }
-    };
-
-    // Load từ thư mục local (khi đang development và đã chọn thư mục)
-    const loadFromLocal = async () => {
-      if (!rootDirHandle) return;
-      
-      try {
-        const docsDir = await getOrCreateDirectory(rootDirHandle, ['public', 'docs-images']);
-        
-        // Load overview image
-        try {
-          const overviewFile = await docsDir.getFileHandle('overview-image.jpg', { create: false });
-          const file = await overviewFile.getFile();
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            setOverviewImage(e.target?.result as string);
-          };
-          reader.readAsDataURL(file);
-        } catch {
-          // File không tồn tại, bỏ qua
-        }
-
-        // Load result images
-        const loadPromises: Promise<string | null>[] = [];
-        for (let i = 1; i <= 6; i++) {
-          const promise = (async () => {
-            try {
-              const resultFile = await docsDir.getFileHandle(`result-${i}.jpg`, { create: false });
-              const file = await resultFile.getFile();
-              return new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target?.result as string);
-                reader.readAsDataURL(file);
-              });
-            } catch {
-              return null;
-            }
-          })();
-          loadPromises.push(promise);
-        }
-
-        const loadedImages = await Promise.all(loadPromises);
-        setResultImages(loadedImages.filter((img): img is string => img !== null));
-      } catch (error) {
-        console.error('Error loading images from local:', error);
-      }
-    };
-
-    // Ưu tiên load từ public URL (khi đã deploy)
-    loadFromPublic();
-  }, [rootDirHandle]);
-
-  const handleSelectDirectory = async () => {
-    try {
-      const handle = await requestDirectoryPicker();
-      if (handle) {
-        setRootDirHandle(handle);
-      }
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        alert('Lỗi khi chọn thư mục: ' + error.message);
-      }
+        img2.src = `/DOCS_IMAGES/result-${i}.png`;
+      };
+      img.src = `/DOCS_IMAGES/result-${i}.jpg`;
     }
-  };
-
-  const saveImageToDirectory = async (file: File, filename: string): Promise<string> => {
-    if (!rootDirHandle) {
-      throw new Error('Chưa chọn thư mục lưu ảnh');
-    }
-
-    // Lưu vào public/docs-images/ để khi build/deploy, mọi người dùng đều thấy
-    const docsDir = await getOrCreateDirectory(rootDirHandle, ['public', 'docs-images']);
-    const fileHandle = await docsDir.getFileHandle(filename, { create: true });
-    const writable = await fileHandle.createWritable();
-    const arrayBuffer = await file.arrayBuffer();
-    await writable.write(arrayBuffer);
-    await writable.close();
-
-    // Return public URL path để hiển thị
-    return `/docs-images/${filename}`;
-  };
-
-  const handleOverviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!rootDirHandle) {
-      alert('Vui lòng chọn thư mục lưu ảnh trước');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const dataUrl = await saveImageToDirectory(file, 'overview-image.jpg');
-      setOverviewImage(dataUrl);
-    } catch (error: any) {
-      alert('Lỗi khi lưu ảnh: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResultImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    if (!rootDirHandle) {
-      alert('Vui lòng chọn thư mục lưu ảnh trước');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const filesToProcess = files.slice(0, 6);
-      const promises = filesToProcess.map((file, index) => 
-        saveImageToDirectory(file, `result-${index + 1}.jpg`)
-      );
-      const imageUrls = await Promise.all(promises);
-      setResultImages(imageUrls);
-    } catch (error: any) {
-      alert('Lỗi khi lưu ảnh: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const removeOverviewImage = async () => {
-    if (!rootDirHandle) {
-      // Nếu không có rootDirHandle, chỉ xóa khỏi state (ảnh đã deploy)
-      setOverviewImage('');
-      return;
-    }
-    
-    try {
-      const docsDir = await getOrCreateDirectory(rootDirHandle, ['public', 'docs-images']);
-      await docsDir.removeEntry('overview-image.jpg');
-      setOverviewImage('');
-    } catch (error: any) {
-      if (error.name !== 'NotFoundError') {
-        alert('Lỗi khi xóa ảnh: ' + error.message);
-      } else {
-        setOverviewImage('');
-      }
-    }
-  };
-
-  const removeResultImage = async (index: number) => {
-    if (!rootDirHandle) {
-      // Nếu không có rootDirHandle, chỉ xóa khỏi state (ảnh đã deploy)
-      setResultImages(prev => prev.filter((_, i) => i !== index));
-      return;
-    }
-    
-    try {
-      const docsDir = await getOrCreateDirectory(rootDirHandle, ['public', 'docs-images']);
-      
-      // Xóa file hiện tại
-      try {
-        await docsDir.removeEntry(`result-${index + 1}.jpg`);
-      } catch (error: any) {
-        if (error.name !== 'NotFoundError') {
-          throw error;
-        }
-      }
-
-      // Reindex các file còn lại
-      const remainingImages = resultImages.filter((_, i) => i !== index);
-      const tempDir = await getOrCreateDirectory(rootDirHandle, ['public', 'docs-images-temp']);
-      
-      // Di chuyển các file còn lại vào temp
-      for (let i = index + 2; i <= 6; i++) {
-        try {
-          const oldFile = await docsDir.getFileHandle(`result-${i}.jpg`, { create: false });
-          const file = await oldFile.getFile();
-          const newFileHandle = await tempDir.getFileHandle(`result-${i}.jpg`, { create: true });
-          const writable = await newFileHandle.createWritable();
-          const arrayBuffer = await file.arrayBuffer();
-          await writable.write(arrayBuffer);
-          await writable.close();
-          await docsDir.removeEntry(`result-${i}.jpg`);
-        } catch {
-          // File không tồn tại, bỏ qua
-        }
-      }
-
-      // Di chuyển lại từ temp về docs với index mới
-      for (let i = index + 2; i <= 6; i++) {
-        try {
-          const tempFile = await tempDir.getFileHandle(`result-${i}.jpg`, { create: false });
-          const file = await tempFile.getFile();
-          const newIndex = i - 1;
-          const newFileHandle = await docsDir.getFileHandle(`result-${newIndex}.jpg`, { create: true });
-          const writable = await newFileHandle.createWritable();
-          const arrayBuffer = await file.arrayBuffer();
-          await writable.write(arrayBuffer);
-          await writable.close();
-          await tempDir.removeEntry(`result-${i}.jpg`);
-        } catch {
-          // File không tồn tại, bỏ qua
-        }
-      }
-
-      // Xóa temp dir nếu rỗng
-      try {
-        const publicDir = await getOrCreateDirectory(rootDirHandle, ['public']);
-        await publicDir.removeEntry('docs-images-temp', { recursive: true });
-      } catch {
-        // Bỏ qua nếu không xóa được
-      }
-
-      setResultImages(remainingImages);
-    } catch (error: any) {
-      alert('Lỗi khi xóa ảnh: ' + error.message);
-    }
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -468,78 +260,15 @@ const OverviewSection: React.FC = () => {
         </h1>
         
         <div className="space-y-6">
-          {/* Chọn thư mục lưu ảnh */}
-          {!rootDirHandle && (
-            <div className="glass-light rounded-lg p-4 border-2 border-dashed border-slate-300 text-center">
-              <FolderOpen className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-              <p className="text-slate-700 font-medium mb-3">Chưa chọn thư mục lưu ảnh</p>
-              <button
-                onClick={handleSelectDirectory}
-                className="px-6 py-3 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all"
-              >
-                <FolderOpen className="w-5 h-5 inline mr-2" />
-                Chọn thư mục lưu ảnh
-              </button>
-              <p className="text-xs text-slate-500 mt-2">
-                Chọn thư mục <strong>root của project</strong> (nơi có thư mục public/). 
-                Ảnh sẽ được lưu vào <strong>public/docs-images/</strong> để khi build/deploy, tất cả người dùng đều thấy.
-              </p>
-            </div>
-          )}
-
-          {rootDirHandle && (
-            <div className="glass-light rounded-lg p-3 border border-slate-200 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-700">
-                  <strong>Thư mục:</strong> {rootDirHandle.name}/public/docs-images/
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  💡 Ảnh sẽ được lưu vào public/docs-images/ để khi build/deploy, tất cả người dùng đều thấy
-                </p>
-              </div>
-              <button
-                onClick={handleSelectDirectory}
-                className="text-sm text-blue-600 hover:text-blue-700 underline"
-              >
-                Đổi thư mục
-              </button>
-            </div>
-          )}
-
-          {/* Upload Area for Overview Image */}
-          {rootDirHandle && (
-            <div className="glass-light rounded-lg p-4 border border-slate-200">
-              <label className="block mb-3 text-slate-900 font-semibold text-lg">
-                📊 Upload ảnh mô hình tổng thể (1 ảnh):
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleOverviewImageUpload}
-                className="hidden"
-                id="overview-image-upload"
-                disabled={loading}
-              />
-              <label 
-                htmlFor="overview-image-upload" 
-                className={`cursor-pointer inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 hover:from-blue-600 hover:via-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Image className="w-5 h-5 mr-2" />
-                {loading ? 'Đang lưu...' : overviewImage ? 'Thay đổi ảnh' : 'Chọn ảnh mô hình'}
-              </label>
-            {overviewImage && (
-              <button
-                onClick={removeOverviewImage}
-                className="ml-3 px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white font-semibold rounded-lg transition-all text-sm shadow-sm"
-              >
-                Xóa ảnh
-              </button>
-            )}
-            <p className="text-sm text-slate-600 mt-2">
-              Upload 1 ảnh mô tả tổng quan về hệ thống và quy trình xử lý
+          {/* Info về ảnh từ DOCS_IMAGES */}
+          <div className="glass-light rounded-lg p-3 border border-slate-200">
+            <p className="text-sm text-slate-700">
+              <strong>📁 Ảnh được load từ:</strong> <code className="bg-slate-100 px-2 py-1 rounded">DOCS_IMAGES/</code>
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Đặt file <code className="bg-slate-100 px-1 rounded">overview-image.jpg</code> và <code className="bg-slate-100 px-1 rounded">result-1.jpg</code> đến <code className="bg-slate-100 px-1 rounded">result-6.jpg</code> vào thư mục DOCS_IMAGES trong project.
             </p>
           </div>
-          )}
 
           {/* Overview Image Display */}
           {overviewImage ? (
@@ -556,7 +285,9 @@ const OverviewSection: React.FC = () => {
                 <Image className="w-12 h-12 text-slate-400" />
               </div>
               <p className="text-slate-700 font-medium text-lg mb-2">Chưa có ảnh mô hình</p>
-              <p className="text-slate-500 text-sm">Vui lòng upload ảnh ở trên để hiển thị mô hình tổng thể</p>
+              <p className="text-slate-500 text-sm">
+                Đặt file <code className="bg-slate-100 px-1 rounded">overview-image.jpg</code> vào thư mục <code className="bg-slate-100 px-1 rounded">DOCS_IMAGES/</code>
+              </p>
             </div>
           )}
         </div>
@@ -660,33 +391,6 @@ const OverviewSection: React.FC = () => {
         </h2>
         
         <div className="space-y-6">
-          {/* Upload Area for Result Images */}
-          {rootDirHandle && (
-            <div className="glass-light rounded-lg p-4 border border-slate-200">
-              <label className="block mb-3 text-slate-900 font-semibold text-lg">
-                📸 Upload ảnh kết quả (tối đa 6 ảnh):
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleResultImagesUpload}
-                className="hidden"
-                id="result-images-upload"
-                disabled={loading}
-              />
-              <label 
-                htmlFor="result-images-upload" 
-                className={`cursor-pointer inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-500 via-blue-600 to-cyan-500 hover:from-indigo-600 hover:via-blue-700 hover:to-cyan-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Image className="w-5 h-5 mr-2" />
-                {loading ? 'Đang lưu...' : 'Chọn ảnh kết quả'}
-              </label>
-              <p className="text-sm text-slate-600 mt-2">
-                Upload tối đa 6 ảnh minh họa kết quả xử lý (đã lưu: {resultImages.length}/6)
-              </p>
-            </div>
-          )}
 
           {/* Result Images Grid with Arrows */}
           {resultImages.length > 0 && (
@@ -712,14 +416,7 @@ const OverviewSection: React.FC = () => {
                       </div>
                     )}
                     
-                    <div className="glass-light rounded-lg overflow-hidden border-2 border-slate-300 hover:border-indigo-400 hover:shadow-xl transition-all relative group">
-                      <button
-                        onClick={() => removeResultImage(idx)}
-                        className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-                        title="Xóa ảnh"
-                      >
-                        <span className="text-sm font-bold">×</span>
-                      </button>
+                    <div className="glass-light rounded-lg overflow-hidden border-2 border-slate-300 hover:border-indigo-400 hover:shadow-xl transition-all">
                       <img 
                         src={img} 
                         alt={`Kết quả ${idx + 1}`}
@@ -764,14 +461,7 @@ const OverviewSection: React.FC = () => {
                         </div>
                       )}
                       
-                      <div className="glass-light rounded-lg overflow-hidden border-2 border-slate-300 hover:border-cyan-400 hover:shadow-xl transition-all relative group">
-                        <button
-                          onClick={() => removeResultImage(idx + 3)}
-                          className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-                          title="Xóa ảnh"
-                        >
-                          <span className="text-sm font-bold">×</span>
-                        </button>
+                      <div className="glass-light rounded-lg overflow-hidden border-2 border-slate-300 hover:border-cyan-400 hover:shadow-xl transition-all">
                         <img 
                           src={img} 
                           alt={`Kết quả ${idx + 4}`}
@@ -795,7 +485,9 @@ const OverviewSection: React.FC = () => {
                 <Image className="w-12 h-12 text-slate-400" />
               </div>
               <p className="text-slate-700 font-medium text-lg mb-2">Chưa có ảnh kết quả</p>
-              <p className="text-slate-500 text-sm">Vui lòng upload ảnh ở trên để hiển thị kết quả minh họa</p>
+              <p className="text-slate-500 text-sm">
+                Đặt file <code className="bg-slate-100 px-1 rounded">result-1.jpg</code> đến <code className="bg-slate-100 px-1 rounded">result-6.jpg</code> vào thư mục <code className="bg-slate-100 px-1 rounded">DOCS_IMAGES/</code>
+              </p>
             </div>
           )}
         </div>
@@ -1410,16 +1102,114 @@ const SplittingLogicSection: React.FC = () => (
       </h1>
       <p className="text-slate-700 text-lg leading-relaxed">
         Logic tách file là phần phức tạp nhất của hệ thống, sử dụng State Machine pattern để xác định các điểm cắt 
-        và tạo các tài liệu riêng biệt từ một file PDF lớn.
+        và tạo các tài liệu riêng biệt từ một file PDF lớn. Tất cả thông tin được lấy từ kết quả phân tích Gemini AI.
       </p>
     </div>
 
     <div className="glass-strong rounded-2xl p-8 border border-slate-200">
-      <h2 className="text-2xl font-bold text-slate-900 mb-4">State Machine Pattern</h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-4">📋 Các Prompt Gửi Đến Gemini</h2>
+      
+      <div className="space-y-6">
+        <div className="glass-light rounded-lg p-4 border border-slate-200">
+          <h3 className="font-bold text-slate-900 mb-3 text-lg">🔍 Call 1: Preview - Tìm LOG Page</h3>
+          <p className="text-sm text-slate-700 mb-3">
+            <strong>Input:</strong> 10 trang đầu tiên của PDF
+          </p>
+          <p className="text-sm text-slate-700 mb-3">
+            <strong>Mục đích:</strong> Xác định trang LOG đầu tiên để tối ưu hóa việc chia batch
+          </p>
+          <pre className="bg-slate-900 text-slate-100 p-4 rounded text-xs overflow-x-auto border border-slate-700">
+{`Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ: Tìm trang LOG đầu tiên.
+
+PHÂN TÍCH TỪNG TRANG:
+- isLogPage: true nếu trang là LOG (chụp màn hình, bảng log, email in, không có formCode, không có tiêu đề biểu mẫu).
+- Trang LOG thường có: ảnh chụp màn hình, bảng log, email, không có "Mã số" ở góc.
+
+OUTPUT JSON FORMAT (Chỉ trả về JSON):
+{
+  "pages": [
+    {
+      "page": 1,
+      "isLogPage": true | false
+    },
+    ...
+  ]
+}`}
+          </pre>
+          <p className="text-xs text-slate-500 mt-2">
+            💡 Nếu không tìm thấy LOG trong 10 trang đầu, hệ thống sẽ dùng mặc định là trang 8.
+          </p>
+        </div>
+
+        <div className="glass-light rounded-lg p-4 border border-slate-200">
+          <h3 className="font-bold text-slate-900 mb-3 text-lg">📊 Call 2 & 3: Batch 1 & Batch 2 - Phân Tích Toàn Diện</h3>
+          <p className="text-sm text-slate-700 mb-3">
+            <strong>Input:</strong> Nửa đầu file (Batch 1) và nửa sau file (Batch 2)
+          </p>
+          <p className="text-sm text-slate-700 mb-3">
+            <strong>Mục đích:</strong> Phân tích TẤT CẢ thông tin cần thiết trong 1 lần gọi API
+          </p>
+          <pre className="bg-slate-900 text-slate-100 p-4 rounded text-xs overflow-x-auto border border-slate-700 max-h-96 overflow-y-auto">
+{`Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Hãy phân loại MỖI TRANG vào 4 loại:
+- FORM_HEADER: Trang có khung "Mã số"/"Code" ở góc (QT.MSI-..., KTKS.MSI-...).
+- LOG_SCREEN: Trang chụp màn hình (Total Commander/FileZilla/email), không có formCode.
+- SOURCE_HEADER: Trang đầu bản tin gốc (có "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" hoặc header bản tin), KHÔNG có formCode.
+- CONTENT: Trang nội dung tiếp theo.
+
+YÊU CẦU TRÍCH XUẤT:
+- page: số trang (1-based).
+- type: FORM_HEADER | LOG_SCREEN | SOURCE_HEADER | CONTENT.
+- formCode: chỉ lấy từ khung "Mã số/Code" ở góc; nếu không thấy → null.
+- serviceHint: NTX | RTP | EGC | NAVTEX | null (từ mã đài xử lý hoặc dấu hiệu trên trang).
+- broadcastCode: MET | NAV | SAR | WX | TUYEN | null (nếu nhận ra).
+- hasSignature: true nếu có chữ ký/tên người ở cuối trang (chỉ phần ký duyệt, không phải tên trong nội dung).
+- isLogPage: true nếu LOG_SCREEN, false otherwise.
+- isBanTinNguonHeader: true chỉ khi là SOURCE_HEADER (header "CỘNG HÒA..." và không có formCode).
+- hasEmail: true nếu trang log có địa chỉ email.
+
+LƯU Ý:
+- LOG_SCREEN luôn có formCode = null.
+- FORM_HEADER luôn có formCode khác null.
+- SOURCE_HEADER không có formCode.
+- Nếu thấy NAVTEX trên trang, serviceHint = NTX (map NAVTEX → NTX).
+
+OUTPUT JSON (chỉ JSON, không giải thích):
+{
+  "broadcastCode": "MET"|"NAV"|"SAR"|"WX"|"TUYEN"|null,
+  "serviceCode": "NTX"|"RTP"|"EGC"|null,
+  "pages": [
+    {
+      "page": 1,
+      "type": "FORM_HEADER" | "LOG_SCREEN" | "SOURCE_HEADER" | "CONTENT",
+      "formCode": "QT.MSI-BM.03" | "KTKS.MSI.TC-BM.01" | null,
+      "serviceHint": "NTX" | "RTP" | "EGC" | "NAVTEX" | null,
+      "broadcastCode": "MET" | "NAV" | "SAR" | "WX" | "TUYEN" | null,
+      "hasSignature": true | false,
+      "isLogPage": true | false,
+      "isBanTinNguonHeader": true | false,
+      "hasEmail": true | false
+    }
+  ]
+}`}
+          </pre>
+          <div className="mt-3 space-y-2 text-sm text-slate-700">
+            <p><strong>Kết quả trả về:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4">
+              <li><code className="bg-slate-200 px-1 rounded">broadcastCode</code>: Mã broadcast toàn cục (MET, NAV, SAR, WX, TUYEN)</li>
+              <li><code className="bg-slate-200 px-1 rounded">serviceCode</code>: Mã dịch vụ toàn cục (NTX, RTP, EGC)</li>
+              <li><code className="bg-slate-200 px-1 rounded">pages[]</code>: Mảng thông tin chi tiết từng trang với tất cả các trường trên</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="glass-strong rounded-2xl p-8 border border-slate-200">
+      <h2 className="text-2xl font-bold text-slate-900 mb-4">🔄 State Machine Pattern</h2>
       
       <div className="space-y-4 text-slate-700">
         <p className="leading-relaxed">
-          Hệ thống duyệt qua từng trang PDF và duy trì state hiện tại để quyết định khi nào cần cắt file mới.
+          Sau khi nhận kết quả từ Gemini, hệ thống duyệt qua từng trang PDF và duy trì state hiện tại để quyết định khi nào cần cắt file mới.
         </p>
 
         <div className="glass-light rounded-lg p-4 border border-slate-200">
@@ -1429,24 +1219,37 @@ const SplittingLogicSection: React.FC = () => (
               <strong className="text-slate-900">currentDocPages:</strong> Mảng các trang hiện tại đang thu thập
             </li>
             <li>
-              <strong className="text-slate-900">currentDocFormCode:</strong> Mã số của tài liệu hiện tại
+              <strong className="text-slate-900">currentDocFormCode:</strong> Mã số của tài liệu hiện tại (từ <code className="bg-slate-200 px-1 rounded">formCode</code> trong kết quả Gemini)
             </li>
             <li>
               <strong className="text-slate-900">currentDocService:</strong> Service code (NTX/RTP/EGC) của tài liệu hiện tại
             </li>
             <li>
-              <strong className="text-slate-900">currentServiceState:</strong> Service code toàn cục (có thể thay đổi khi gặp hint mới)
+              <strong className="text-slate-900">currentServiceState:</strong> Service code toàn cục (có thể thay đổi khi gặp <code className="bg-slate-200 px-1 rounded">serviceHint</code> mới)
             </li>
           </ul>
         </div>
 
         <div className="glass-light rounded-lg p-4 border border-slate-200">
           <h3 className="font-bold text-slate-900 mb-2">Breakpoints (Điểm Cắt):</h3>
-          <p className="text-sm mb-2">File được cắt tại các điểm sau:</p>
+          <p className="text-sm mb-2">File được cắt tại các điểm sau (dựa trên <code className="bg-slate-200 px-1 rounded">type</code> từ Gemini):</p>
           <ol className="list-decimal list-inside space-y-1 text-sm">
-            <li><strong>LOG_SCREEN:</strong> Trang LOG luôn được tách riêng</li>
-            <li><strong>FORM_HEADER:</strong> Trang có mã số mới → bắt đầu tài liệu mới</li>
-            <li><strong>SOURCE_HEADER sau FORM_HEADER:</strong> Bản tin nguồn sau biểu mẫu</li>
+            <li><strong>LOG_SCREEN:</strong> Trang LOG luôn được tách riêng (dựa trên <code className="bg-slate-200 px-1 rounded">isLogPage: true</code>)</li>
+            <li><strong>FORM_HEADER:</strong> Trang có mã số mới → bắt đầu tài liệu mới (khi <code className="bg-slate-200 px-1 rounded">formCode</code> thay đổi)</li>
+            <li><strong>SOURCE_HEADER sau FORM_HEADER:</strong> Bản tin nguồn sau biểu mẫu (khi <code className="bg-slate-200 px-1 rounded">isBanTinNguonHeader: true</code>)</li>
+          </ol>
+        </div>
+
+        <div className="glass-light rounded-lg p-4 border border-slate-200">
+          <h3 className="font-bold text-slate-900 mb-2">Quy Trình Xử Lý:</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li>Nhận kết quả từ Gemini (3 API calls: preview + batch 1 + batch 2)</li>
+            <li>Merge kết quả từ 2 batch lại thành 1 mảng <code className="bg-slate-200 px-1 rounded">pages[]</code> đầy đủ</li>
+            <li>Duyệt qua từng trang theo thứ tự (page 1 → page N)</li>
+            <li>Kiểm tra <code className="bg-slate-200 px-1 rounded">type</code> của trang hiện tại</li>
+            <li>Nếu là breakpoint (LOG_SCREEN, FORM_HEADER mới, SOURCE_HEADER sau FORM_HEADER) → flush document hiện tại và bắt đầu document mới</li>
+            <li>Thu thập các trang vào <code className="bg-slate-200 px-1 rounded">currentDocPages</code> cho đến khi gặp breakpoint tiếp theo</li>
+            <li>Khi flush document: Tạo file PDF mới từ các trang đã thu thập, xác định đường dẫn lưu trữ dựa trên <code className="bg-slate-200 px-1 rounded">formCode</code> và <code className="bg-slate-200 px-1 rounded">serviceCode</code></li>
           </ol>
         </div>
       </div>
