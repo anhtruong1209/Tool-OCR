@@ -8,8 +8,11 @@ import {
 } from './geminiService';
 
 // Cấu hình worker từ CDN để tránh 404 khi deploy
-const PDFJS_VERSION = pdfjsLib.version || '5.4.394';
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+const PDFJS_VERSION = (pdfjsLib as any)?.version || '5.4.394';
+if ((pdfjsLib as any)?.GlobalWorkerOptions) {
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+}
 
 const sanitizeFilePart = (value: string, maxLength: number = 80): string => {
   if (!value) return '';

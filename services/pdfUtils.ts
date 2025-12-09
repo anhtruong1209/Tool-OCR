@@ -1,9 +1,12 @@
 // Import pdfjs-dist trực tiếp và trỏ worker lên CDN ổn định
 import * as pdfjsLib from 'pdfjs-dist';
 
-const PDFJS_VERSION = pdfjsLib.version || '5.4.394';
-// Dùng build chuẩn (non-legacy). Worker được lấy từ CDN để tránh 404 khi bundle
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+const PDFJS_VERSION = (pdfjsLib as any)?.version || '5.4.394';
+// Cấu hình workerSrc an toàn (chỉ đặt khi tồn tại GlobalWorkerOptions)
+if ((pdfjsLib as any)?.GlobalWorkerOptions) {
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+}
 
 export const convertPdfToImage = async (file: File, maxPages?: number): Promise<string[]> => {
   try {
