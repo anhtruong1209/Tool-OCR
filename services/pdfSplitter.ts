@@ -299,89 +299,23 @@ export const splitPdfByKeywords = async (
         !!formCode &&
         !!currentDocFormCode &&
         formCode !== currentDocFormCode;
-      
-      // ĐẶC BIỆT: QT.MSI-BM.04 và KTKS.MSI.TC-BM.03 có thể xuất hiện nhiều lần với service khác nhau
-      // Nếu cùng formCode nhưng service khác → cũng phải cắt (ví dụ: QT.MSI-BM.04 RTP vs QT.MSI-BM.04 NTX)
-      const isSameFormCodeButDifferentService =
-        !!formCode &&
-        !!currentDocFormCode &&
-        formCode === currentDocFormCode &&
-        (formCode.includes('BM.04') || formCode.includes('BM-04') || formCode.includes('TC-BM.03')) &&
-        !!pageService &&
-        !!currentDocService &&
-        pageService !== currentDocService;
-      
-      // DEBUG: Log để kiểm tra
-      if (formCode && currentDocFormCode) {
-        console.log(`[PDF Splitter] Page ${pageNum}: currentDocFormCode=${currentDocFormCode}, formCode=${formCode}, pageService=${pageService}, currentDocService=${currentDocService}`);
-      }
-
-      // QUY TẮC CHUẨN: Kiểm tra formCode TRƯỚC KHI push trang vào document
-      // Đây là kiểm tra CHÍNH để đảm bảo mỗi document chỉ có 1 formCode
-      // Logic này phải chạy TRƯỚC tất cả các logic khác
-      let shouldCutBeforeThisPage = false;
-      
-      if (currentDocPages.length > 0) {
-        // QUY TẮC 1: Nếu document hiện tại đã có formCode và trang này có formCode khác → CẮT NGAY
-        // Điều này đảm bảo QT.MSI-BM.03 không bao gồm KTKS.MSI.TC-BM.03
-        if (currentDocFormCode && formCode && formCode !== currentDocFormCode) {
-          console.log(`[PDF Splitter] QUY TẮC 1: FormCode change detected: ${currentDocFormCode} → ${formCode} at page ${pageNum}. Cutting before page ${pageNum}.`);
-          shouldCutBeforeThisPage = true;
-        }
-        // QUY TẮC 2: Nếu document hiện tại chưa có formCode nhưng trang này có formCode → CẮT để bắt đầu document mới
-        else if (!currentDocFormCode && formCode) {
-          console.log(`[PDF Splitter] QUY TẮC 2: FormCode detected on page ${pageNum}: ${formCode}. Starting new document.`);
-          shouldCutBeforeThisPage = true;
-        }
-        // QUY TẮC 3: ĐẶC BIỆT - Kiểm tra QT.MSI-BM.04 với service khác nhau
-        // Nếu cùng formCode QT.MSI-BM.04 nhưng service khác → cũng phải cắt
-        else if (currentDocFormCode && 
-                 formCode && 
-                 formCode === currentDocFormCode &&
-                 (formCode.includes('BM.04') || formCode.includes('BM-04')) &&
-                 pageService &&
-                 currentDocService &&
-                 pageService !== currentDocService) {
-          console.log(`[PDF Splitter] QUY TẮC 3: Same formCode ${formCode} but different service detected: ${currentDocService} → ${pageService} at page ${pageNum}. Cutting before page ${pageNum}.`);
-          shouldCutBeforeThisPage = true;
-        }
-      }
-      
-      // QUY TẮC 4: Kiểm tra SOURCE_HEADER - Nếu document hiện tại có formCode và gặp SOURCE_HEADER → CẮT
-      if (pageType === 'SOURCE_HEADER' && currentDocPages.length > 0 && currentDocFormCode) {
-        console.log(`[PDF Splitter] QUY TẮC 4: SOURCE_HEADER detected at page ${pageNum} but current document has formCode ${currentDocFormCode}. Cutting before page ${pageNum}.`);
-        shouldCutBeforeThisPage = true;
-      }
-      
-      // Nếu cần cắt, flush document trước và bắt đầu document mới
-      if (shouldCutBeforeThisPage) {
-        flushDoc();
-        currentDocPages = [];
-        currentDocFormCode = formCode || null;
-        currentDocService = pageService || currentServiceState || null;
-      }
 
       // Breakpoint đơn giản:
       // - Gặp LOG_SCREEN → cắt
       // - Gặp FORM_HEADER có mã → luôn cắt (kể cả trùng mã, để không gộp nhiều biểu mẫu)
       // - Nếu formCode thay đổi so với tài liệu hiện tại → cắt (dù Gemini có thể đánh nhầm type)
       // - Nếu service (NTX/RTP/EGC) thay đổi so với tài liệu hiện tại → cắt
-      // - ĐẶC BIỆT: Cùng formCode (BM.04 hoặc TC-BM.03) nhưng service khác → cắt (ví dụ: QT.MSI-BM.04 RTP vs QT.MSI-BM.04 NTX)
       // - SOURCE_HEADER ngay sau FORM_HEADER → cắt (bản tin nguồn)
       const isBreakpoint =
         pageType === 'LOG_SCREEN' ||
         isFormHeaderWithCode ||
         isFormCodeChange ||
         isServiceChange ||
-        isSameFormCodeButDifferentService ||
         (pageType === 'SOURCE_HEADER' && classifyPage(pageNum - 1) === 'FORM_HEADER');
 
       // If breakpoint and we already have pages → flush before starting new
       if (isBreakpoint && currentDocPages.length > 0) {
         flushDoc();
-        currentDocPages = [];
-        currentDocFormCode = formCode || null;
-        currentDocService = pageService || currentServiceState || null;
       }
 
       // Handle LOG
@@ -390,10 +324,22 @@ export const splitPdfByKeywords = async (
         continue;
       }
 
-      // Start new doc if breakpoint or empty
+      // Start new doc if breakpoint
       if (isBreakpoint || currentDocPages.length === 0) {
         currentDocPages = [];
         currentDocFormCode = formCode || null;
+        currentDocService = pageService || currentServiceState || null;
+      }
+
+      // QUAN TRỌNG: Kiểm tra xem trang này có formCode khác với document hiện tại không
+      // Nếu có, phải cắt TRƯỚC trang này (không bao gồm trang này trong document trước)
+      // Điều này đảm bảo mỗi document chỉ có 1 formCode duy nhất
+      if (currentDocPages.length > 0 && currentDocFormCode && formCode && formCode !== currentDocFormCode) {
+        // Trang này có formCode khác → cắt document trước, bắt đầu document mới
+        console.log(`[PDF Splitter] FormCode change detected: ${currentDocFormCode} → ${formCode} at page ${pageNum}. Cutting before page ${pageNum}.`);
+        flushDoc();
+        currentDocPages = [];
+        currentDocFormCode = formCode;
         currentDocService = pageService || currentServiceState || null;
       }
 
@@ -401,61 +347,32 @@ export const splitPdfByKeywords = async (
       currentDocPages.push(pageNum);
 
       // VALIDATION: Sau khi push, kiểm tra lại toàn bộ document để đảm bảo chỉ có 1 formCode
-      // Nếu phát hiện formCode khác, cắt lại NGAY LẬP TỨC
-      // Đây là lớp bảo vệ cuối cùng để đảm bảo không có document nào chứa 2 formCode
-      // QUAN TRỌNG: Phải kiểm tra từ đầu đến cuối document để tìm formCode đầu tiên khác
+      // Nếu phát hiện formCode khác, cắt lại
       if (currentDocPages.length > 1 && currentDocFormCode) {
-        let foundDifferentFormCode = false;
-        let cutIndex = -1;
-        
-        // Kiểm tra tất cả các trang trong document (từ trang thứ 2 trở đi)
+        // Kiểm tra tất cả các trang trong document (trừ trang đầu vì đó là trang có formCode)
         for (let i = 1; i < currentDocPages.length; i++) {
           const p = currentDocPages[i];
           const pInfo = analysis.pages.find(pp => pp.page === p);
           const pFormCode = pInfo?.formCode || null;
-          const pService = getServiceFromPage(pInfo);
           
-          // Nếu trang này có formCode và khác với formCode của document → CẮT NGAY
+          // Nếu trang này có formCode và khác với formCode của document
           if (pFormCode && pFormCode !== currentDocFormCode) {
             console.warn(`[PDF Splitter] VALIDATION ERROR: Page ${p} has formCode ${pFormCode} but document has ${currentDocFormCode}. Cutting before page ${p}.`);
-            foundDifferentFormCode = true;
-            cutIndex = i;
-            break; // Tìm thấy formCode khác đầu tiên → cắt ngay
+            
+            // Cắt document trước trang p
+            const pagesBefore = currentDocPages.slice(0, i);
+            const pagesAfter = currentDocPages.slice(i);
+            
+            // Flush document trước
+            currentDocPages = pagesBefore;
+            flushDoc();
+            
+            // Bắt đầu document mới từ trang p
+            currentDocPages = pagesAfter;
+            currentDocFormCode = pFormCode;
+            currentDocService = getServiceFromPage(pInfo) || currentDocService;
+            break; // Chỉ cắt một lần
           }
-          
-          // ĐẶC BIỆT: Kiểm tra cùng formCode nhưng service khác (cho BM.04)
-          if (pFormCode && 
-              pFormCode === currentDocFormCode &&
-              (pFormCode.includes('BM.04') || pFormCode.includes('BM-04')) &&
-              pService &&
-              currentDocService &&
-              pService !== currentDocService) {
-            console.warn(`[PDF Splitter] VALIDATION ERROR: Page ${p} has same formCode ${pFormCode} but different service (${currentDocService} → ${pService}). Cutting before page ${p}.`);
-            foundDifferentFormCode = true;
-            cutIndex = i;
-            break; // Tìm thấy cùng formCode nhưng service khác → cắt ngay
-          }
-        }
-        
-        // Nếu tìm thấy formCode khác, cắt document
-        if (foundDifferentFormCode && cutIndex > 0) {
-          const p = currentDocPages[cutIndex];
-          const pInfo = analysis.pages.find(pp => pp.page === p);
-          const pFormCode = pInfo?.formCode || null;
-          const pService = getServiceFromPage(pInfo);
-          
-          // Cắt document trước trang p
-          const pagesBefore = currentDocPages.slice(0, cutIndex);
-          const pagesAfter = currentDocPages.slice(cutIndex);
-          
-          // Flush document trước
-          currentDocPages = pagesBefore;
-          flushDoc();
-          
-          // Bắt đầu document mới từ trang p
-          currentDocPages = pagesAfter;
-          currentDocFormCode = pFormCode;
-          currentDocService = pService || currentDocService;
         }
       }
 

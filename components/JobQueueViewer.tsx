@@ -4,12 +4,11 @@ import { syncFilesToDestination } from '../services/fileSync';
 import { CheckCircle, XCircle, Loader2, Download, Trash2, FileText, Sparkles, Zap, Clock, RefreshCw, FolderSync, Eye } from 'lucide-react';
 
 const TIPS = [
-  "💡 Đang phân tích cấu trúc PDF...",
-  "🔍 Đang quét mã số (Mã số) trên từng trang...",
-  "📋 Đang nhận diện các biểu mẫu (QT.MSI-BM.01, QT.MSI-BM.02, KTKS.MSI.TC-BM.01...)",
-  "📦 Đang tách file theo từng biểu mẫu...",
-  "🎯 Đang phát hiện và tách các trang LOG...",
-  "⚡ Đang tối ưu hóa để tránh giới hạn API...",
+  "💡 Hệ thống đang quét mã số trên từng trang PDF...",
+  "🔍 Đang phân tích và nhận diện chữ ký...",
+  "📦 Đang tách file...",
+  "⚡ Tối ưu hóa để tránh giới hạn API...",
+  "🎯 Phát hiện và tách các trang LOG tự động...",
 ];
 
 interface JobQueueViewerProps {
@@ -487,9 +486,7 @@ export const JobQueueViewer: React.FC<JobQueueViewerProps> = ({ onReset }) => {
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm text-dark">
                 <Sparkles className="w-4 h-4 text-orange-300 animate-pulse" />
-                <span className="animate-in fade-in duration-500">
-                  {processingJob?.statusMessage || TIPS[currentTip]}
-                </span>
+                <span className="animate-in fade-in duration-500">{TIPS[currentTip]}</span>
               </div>
             </div>
           </div>
