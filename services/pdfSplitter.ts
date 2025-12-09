@@ -1,33 +1,6 @@
-// Import pdfjs-dist
-// @ts-ignore - pdfjs-dist exports có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
-import * as pdfjsLib from 'pdfjs-dist';
-
-// QUAN TRỌNG: Set worker source TRƯỚC KHI import bất kỳ module nào khác sử dụng pdfjs-dist
-// Sử dụng CDN để tải worker file - đảm bảo hoạt động trên mọi môi trường (local, IIS, Vercel, etc.)
-// jsdelivr là CDN đáng tin cậy và hỗ trợ ES module worker (.mjs) cho pdfjs-dist v5+
-const PDFJS_VERSION = '5.4.394';
-// @ts-ignore - GlobalWorkerOptions có thể không có trong type definitions nhưng tồn tại ở runtime
-if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
-  // Force set workerSrc từ CDN - không để pdfjs-dist tự resolve từ build output
-  // Điều này đảm bảo worker luôn được load từ CDN, không phụ thuộc vào build output
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
-}
-
-// Extract functions để đảm bảo chúng không bị undefined
-// Sử dụng cách an toàn để extract function
-let getDocument: any;
-try {
-  getDocument = pdfjsLib.getDocument;
-  if (!getDocument) {
-    getDocument = (pdfjsLib as any).getDocument;
-  }
-} catch (e) {
-  console.error('Error extracting getDocument from pdfjs-dist:', e);
-}
-
 import { PDFDocument } from 'pdf-lib';
 import { SplitDocument, SplitResultData } from '../types';
-import { convertPdfToImage } from './pdfUtils';
+import { convertPdfToImage, loadPdfJsLib } from './pdfUtils';
 import { saveFilesToDirectory } from './fileSaver';
 import {
   analyzePDFComplete
@@ -107,10 +80,10 @@ export const splitPdfByKeywords = async (
     const inputFileBaseName = sanitizeFilePart(file.name.replace(/\.[^/.]+$/, '')) || 'Document';
 
     const pdfJsBuffer = arrayBuffer.slice(0);
-    // Kiểm tra getDocument có tồn tại không, nếu không thì thử dùng trực tiếp từ pdfjsLib
-    const getDoc = getDocument || pdfjsLib.getDocument || (pdfjsLib as any).getDocument;
+    const pdfjsLib = await loadPdfJsLib();
+    const getDoc = pdfjsLib?.getDocument;
     if (!getDoc || typeof getDoc !== 'function') {
-      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình.');
+      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình (pdfjs).');
     }
     // @ts-ignore - getDocument có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
     const loadingTask = getDoc({ data: pdfJsBuffer });
