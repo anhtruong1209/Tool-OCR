@@ -813,7 +813,7 @@ export const analyzePDFComplete = async (
   // Batch 2: Từ sau LOG đến hết - để lấy tất cả các biểu mẫu còn lại
   
   // Bước 1: Phân tích batch đầu tiên (1-10 trang) để tìm LOG
-  const PREVIEW_SIZE = Math.min(10, base64Images.length);
+  const PREVIEW_SIZE = Math.min(6, base64Images.length);
   const previewImages = base64Images.slice(0, PREVIEW_SIZE);
   let logPageIndex = -1; // Index trong mảng (0-based)
   
@@ -872,39 +872,71 @@ OUTPUT JSON FORMAT (Chỉ trả về JSON):
     console.warn('[Gemini Service] Preview analysis failed, will use default split:', error);
   }
 
-  // Nếu không tìm thấy LOG trong preview, dùng mặc định là trang 8
-  if (logPageIndex === -1) {
-    logPageIndex = Math.min(7, base64Images.length - 1); // Trang 8 (index 7)
-    console.log(`[Gemini Service] LOG not found in preview, using default split at page ${logPageIndex + 1}`);
-  }
-
   const allBatchResults: PDFAnalysisResult[] = [];
 
-  // Prompt template cho các batch (schema mới)
-  const promptTemplate = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Hãy phân loại MỖI TRANG vào 4 loại:
-- FORM_HEADER: Trang có khung "Mã số"/"Code" ở góc (QT.MSI-..., KTKS.MSI-...).
-- LOG_SCREEN: Trang chụp màn hình (Total Commander/FileZilla/email), không có formCode.
-- SOURCE_HEADER: Trang đầu bản tin gốc (có "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" hoặc header bản tin), KHÔNG có formCode.
-- CONTENT: Trang nội dung tiếp theo.
+  // Prompt template cho các batch (schema mới) - ĐƯỢC TỐI ƯU ĐỂ ĐẢM BẢO KẾT QUẢ NHẤT QUÁN
+  const promptTemplate = `Bạn là chuyên gia phân tích cấu trúc tài liệu hàng hải. Nhiệm vụ: Phân loại CHÍNH XÁC MỖI TRANG theo quy tắc CỐ ĐỊNH.
 
-YÊU CẦU TRÍCH XUẤT:
-- page: số trang (1-based).
-- type: FORM_HEADER | LOG_SCREEN | SOURCE_HEADER | CONTENT.
-- formCode: chỉ lấy từ khung "Mã số/Code" ở góc; nếu không thấy → null.
-- serviceHint: NTX | RTP | EGC | NAVTEX | null (từ mã đài xử lý hoặc dấu hiệu trên trang).
-- broadcastCode: MET | NAV | SAR | WX | TUYEN | null (nếu nhận ra).
-- hasSignature: true nếu có chữ ký/tên người ở cuối trang (chỉ phần ký duyệt, không phải tên trong nội dung).
-- isLogPage: true nếu LOG_SCREEN, false otherwise.
-- isBanTinNguonHeader: true chỉ khi là SOURCE_HEADER (header "CỘNG HÒA..." và không có formCode).
-- hasEmail: true nếu trang log có địa chỉ email.
+QUY TẮC PHÂN LOẠI (ÁP DỤNG THEO THỨ TỰ ƯU TIÊN):
+1. FORM_HEADER: Trang có khung "Mã số" hoặc "Code" ở góc trên phải/bên phải, chứa mã như:
+   - QT.MSI-BM.01, QT.MSI-BM.02, QT.MSI-BM.03, QT.MSI-BM.04
+   - KTKS.MSI.TC-BM.01, KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03
+   → formCode BẮT BUỘC phải có giá trị (không được null)
+   - Sau QT.MSI-BM.02, QT.MSI-BM.03 là tương ứng KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03 ( lưu ý kiểm tra mã số tránh trường hợp 1 file cắt bao gồm cả QT và KTKS)
+   
+2. LOG_SCREEN: Trang chứa ảnh chụp màn hình (Total Commander, FileZilla, email client, hoặc bất kỳ giao diện phần mềm nào)
+   - Đặc điểm: Chủ yếu là ảnh, không có text quan trọng, không có formCode
+   - Có thể có email address, file path, hoặc timestamp
+   → formCode BẮT BUỘC = null, isLogPage = true
+   
+3. SOURCE_HEADER: Trang đầu tiên của bản tin nguồn, có header "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" hoặc tương tự
+   - KHÔNG có formCode (không có khung "Mã số" ở góc)
+   - Có thể có tiêu đề bản tin, ngày tháng, địa danh
+   → formCode = null, isBanTinNguonHeader = true
+   
+4. CONTENT: Tất cả các trang còn lại (nội dung tiếp theo của biểu mẫu hoặc bản tin)
+   → formCode = null (trừ khi có khung "Mã số" thì chuyển thành FORM_HEADER)
 
-LƯU Ý:
-- LOG_SCREEN luôn có formCode = null.
-- FORM_HEADER luôn có formCode khác null.
-- SOURCE_HEADER không có formCode.
-- Nếu thấy NAVTEX trên trang, serviceHint = NTX (map NAVTEX → NTX).
+QUY TẮC TRÍCH XUẤT formCode (QUAN TRỌNG - PHẢI TUÂN THỦ):
+- CHỈ lấy từ khung "Mã số" hoặc "Code" ở góc trên phải/bên phải
+- Phải trích xuất CHÍNH XÁC, không thêm bớt ký tự
+- Các mã phổ biến: QT.MSI-BM.01, QT.MSI-BM.02, QT.MSI-BM.03, QT.MSI-BM.04, KTKS.MSI.TC-BM.01, KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03
+- QUAN TRỌNG: Mỗi trang có khung "Mã số" PHẢI được đánh dấu là FORM_HEADER và có formCode
+- Nếu KHÔNG thấy khung "Mã số" → formCode = null
+- LƯU Ý: Một document có thể có nhiều trang, nhưng CHỈ trang đầu có formCode. Các trang tiếp theo (CONTENT) không có formCode.
+- QUAN TRỌNG: Nếu thấy trang có khung "Mã số" với mã KHÁC với mã ở trang trước → đó là trang đầu của document MỚI, PHẢI đánh dấu là FORM_HEADER
 
-OUTPUT JSON (chỉ JSON, không giải thích):
+QUY TẮC XÁC ĐỊNH LOG_SCREEN (QUAN TRỌNG):
+- Trang LOG thường xuất hiện SAU SOURCE_HEADER (bản tin nguồn)
+- Đặc điểm: Ảnh chụp màn hình, không có formCode, không có text quan trọng
+- Có thể có: email address, file path, timestamp, giao diện phần mềm
+- isLogPage = true CHỈ khi type = LOG_SCREEN
+
+QUY TẮC XÁC ĐỊNH SERVICE (serviceHint):
+- Tìm trong "Mã bản tin Đài xử lý" hoặc text trên trang
+- NTX: Nếu thấy "NAVTEX" hoặc "NTX" trong mã đài
+- RTP: Nếu thấy "RTP" trong mã đài
+- EGC: Nếu thấy "EGC" trong mã đài
+- null: Nếu không tìm thấy
+
+YÊU CẦU TRÍCH XUẤT (CHO MỖI TRANG):
+- page: số trang (1-based)
+- type: FORM_HEADER | LOG_SCREEN | SOURCE_HEADER | CONTENT (chọn 1, không được để trống)
+- formCode: Mã số từ khung góc (chính xác, không thêm bớt) hoặc null
+- serviceHint: NTX | RTP | EGC | NAVTEX | null
+- broadcastCode: MET | NAV | SAR | WX | TUYEN | null
+- hasSignature: true nếu có chữ ký/tên người ở cuối trang (phần ký duyệt)
+- isLogPage: true CHỈ khi type = LOG_SCREEN, false cho tất cả các type khác
+- isBanTinNguonHeader: true CHỈ khi type = SOURCE_HEADER, false cho tất cả các type khác
+- hasEmail: true nếu trang LOG có địa chỉ email
+
+QUY TẮC VALIDATION (KIỂM TRA TRƯỚC KHI TRẢ VỀ):
+- FORM_HEADER → formCode KHÔNG được null
+- LOG_SCREEN → formCode PHẢI null, isLogPage PHẢI true
+- SOURCE_HEADER → formCode PHẢI null, isBanTinNguonHeader PHẢI true
+- CONTENT → formCode PHẢI null
+
+OUTPUT JSON (CHỈ JSON, KHÔNG CÓ TEXT GIẢI THÍCH):
 {
   "broadcastCode": "MET"|"NAV"|"SAR"|"WX"|"TUYEN"|null,
   "serviceCode": "NTX"|"RTP"|"EGC"|null,
@@ -912,7 +944,7 @@ OUTPUT JSON (chỉ JSON, không giải thích):
     {
       "page": 1,
       "type": "FORM_HEADER" | "LOG_SCREEN" | "SOURCE_HEADER" | "CONTENT",
-      "formCode": "QT.MSI-BM.03" | "KTKS.MSI.TC-BM.01" | null,
+      "formCode": "QT.MSI-BM.01" | "QT.MSI-BM.02" | "QT.MSI-BM.03" | "QT.MSI-BM.04" | "KTKS.MSI.TC-BM.01" | "KTKS.MSI.TC-BM.02" | "KTKS.MSI.TC-BM.03" | null,
       "serviceHint": "NTX" | "RTP" | "EGC" | "NAVTEX" | null,
       "broadcastCode": "MET" | "NAV" | "SAR" | "WX" | "TUYEN" | null,
       "hasSignature": true | false,
@@ -977,6 +1009,60 @@ OUTPUT JSON (chỉ JSON, không giải thích):
         let batchResult: PDFAnalysisResult;
         try {
           batchResult = JSON.parse(jsonText);
+          
+          // VALIDATION: Kiểm tra tính hợp lệ của kết quả
+          const validationErrors: string[] = [];
+          
+          if (!batchResult.pages || !Array.isArray(batchResult.pages)) {
+            validationErrors.push('Missing or invalid pages array');
+          } else {
+            // Validate từng trang
+            batchResult.pages.forEach((p, idx) => {
+              const pageNum = p.page || (startPageNum + idx);
+              
+              // Validation rule 1: FORM_HEADER phải có formCode
+              if (p.type === 'FORM_HEADER' && !p.formCode) {
+                validationErrors.push(`Page ${pageNum}: FORM_HEADER must have formCode`);
+              }
+              
+              // Validation rule 2: LOG_SCREEN phải có formCode = null và isLogPage = true
+              if (p.type === 'LOG_SCREEN') {
+                if (p.formCode !== null) {
+                  validationErrors.push(`Page ${pageNum}: LOG_SCREEN must have formCode = null`);
+                }
+                if (p.isLogPage !== true) {
+                  validationErrors.push(`Page ${pageNum}: LOG_SCREEN must have isLogPage = true`);
+                }
+              }
+              
+              // Validation rule 3: SOURCE_HEADER phải có formCode = null và isBanTinNguonHeader = true
+              if (p.type === 'SOURCE_HEADER') {
+                if (p.formCode !== null) {
+                  validationErrors.push(`Page ${pageNum}: SOURCE_HEADER must have formCode = null`);
+                }
+                if (p.isBanTinNguonHeader !== true) {
+                  validationErrors.push(`Page ${pageNum}: SOURCE_HEADER must have isBanTinNguonHeader = true`);
+                }
+              }
+              
+              // Validation rule 4: isLogPage chỉ true khi type = LOG_SCREEN
+              if (p.isLogPage === true && p.type !== 'LOG_SCREEN') {
+                validationErrors.push(`Page ${pageNum}: isLogPage = true but type is not LOG_SCREEN`);
+              }
+              
+              // Validation rule 5: isBanTinNguonHeader chỉ true khi type = SOURCE_HEADER
+              if (p.isBanTinNguonHeader === true && p.type !== 'SOURCE_HEADER') {
+                validationErrors.push(`Page ${pageNum}: isBanTinNguonHeader = true but type is not SOURCE_HEADER`);
+              }
+            });
+          }
+          
+          if (validationErrors.length > 0) {
+            console.warn(`[Gemini Service] Validation errors for batch ${i + 1}:`, validationErrors);
+            // Vẫn sử dụng kết quả nhưng log warning
+            // Có thể thêm retry logic ở đây nếu cần
+          }
+          
           const adjustedPages = batchResult.pages.map(p => ({
             ...p,
             page: (p.page || 1) + start
@@ -1031,6 +1117,25 @@ OUTPUT JSON (chỉ JSON, không giải thích):
   }
 
   console.log(`[Gemini Service] Analysis complete: ${allPages.length} pages, broadcast: ${finalBroadcastCode}, service: ${finalServiceCode}`);
+
+  // FINAL VALIDATION: Kiểm tra toàn bộ kết quả và đảm bảo LOG được xử lý đúng
+  const logPages = allPages.filter(p => p.isLogPage || p.type === 'LOG_SCREEN');
+  const sourceHeaders = allPages.filter(p => p.isBanTinNguonHeader || p.type === 'SOURCE_HEADER');
+  
+  console.log(`[Gemini Service] Validation summary:`);
+  console.log(`  - Total pages: ${allPages.length}`);
+  console.log(`  - LOG pages found: ${logPages.length} (pages: ${logPages.map(p => p.page).join(', ')})`);
+  console.log(`  - SOURCE_HEADER pages found: ${sourceHeaders.length} (pages: ${sourceHeaders.map(p => p.page).join(', ')})`);
+  console.log(`  - FORM_HEADER pages found: ${allPages.filter(p => p.type === 'FORM_HEADER' && p.formCode).length}`);
+  
+  // Validation: LOG thường xuất hiện sau SOURCE_HEADER
+  if (logPages.length > 0 && sourceHeaders.length > 0) {
+    const firstLogPage = Math.min(...logPages.map(p => p.page));
+    const lastSourceHeader = Math.max(...sourceHeaders.map(p => p.page));
+    if (firstLogPage < lastSourceHeader) {
+      console.warn(`[Gemini Service] Warning: LOG page (${firstLogPage}) appears before last SOURCE_HEADER (${lastSourceHeader})`);
+    }
+  }
 
   return {
     broadcastCode: finalBroadcastCode,

@@ -337,8 +337,50 @@ export const splitPdfByKeywords = async (
         currentDocService = pageService || currentServiceState || null;
       }
 
+      // QUAN TRỌNG: Kiểm tra xem trang này có formCode khác với document hiện tại không
+      // Nếu có, phải cắt TRƯỚC trang này (không bao gồm trang này trong document trước)
+      // Điều này đảm bảo mỗi document chỉ có 1 formCode duy nhất
+      if (currentDocPages.length > 0 && currentDocFormCode && formCode && formCode !== currentDocFormCode) {
+        // Trang này có formCode khác → cắt document trước, bắt đầu document mới
+        console.log(`[PDF Splitter] FormCode change detected: ${currentDocFormCode} → ${formCode} at page ${pageNum}. Cutting before page ${pageNum}.`);
+        flushDoc();
+        currentDocPages = [];
+        currentDocFormCode = formCode;
+        currentDocService = pageService || currentServiceState || null;
+      }
+
       // Push page into current doc
       currentDocPages.push(pageNum);
+
+      // VALIDATION: Sau khi push, kiểm tra lại toàn bộ document để đảm bảo chỉ có 1 formCode
+      // Nếu phát hiện formCode khác, cắt lại
+      if (currentDocPages.length > 1 && currentDocFormCode) {
+        // Kiểm tra tất cả các trang trong document (trừ trang đầu vì đó là trang có formCode)
+        for (let i = 1; i < currentDocPages.length; i++) {
+          const p = currentDocPages[i];
+          const pInfo = analysis.pages.find(pp => pp.page === p);
+          const pFormCode = pInfo?.formCode || null;
+          
+          // Nếu trang này có formCode và khác với formCode của document
+          if (pFormCode && pFormCode !== currentDocFormCode) {
+            console.warn(`[PDF Splitter] VALIDATION ERROR: Page ${p} has formCode ${pFormCode} but document has ${currentDocFormCode}. Cutting before page ${p}.`);
+            
+            // Cắt document trước trang p
+            const pagesBefore = currentDocPages.slice(0, i);
+            const pagesAfter = currentDocPages.slice(i);
+            
+            // Flush document trước
+            currentDocPages = pagesBefore;
+            flushDoc();
+            
+            // Bắt đầu document mới từ trang p
+            currentDocPages = pagesAfter;
+            currentDocFormCode = pFormCode;
+            currentDocService = getServiceFromPage(pInfo) || currentDocService;
+            break; // Chỉ cắt một lần
+          }
+        }
+      }
 
       // Guard: nếu đang trong doc và gặp trang CONTENT nhưng serviceHint khác với currentDocService thì cắt trước trang này
       const serviceHintThisPage = getServiceFromPage(pageInfo);
