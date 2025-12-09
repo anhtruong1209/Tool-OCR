@@ -1,10 +1,15 @@
+import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
 import { SplitDocument, SplitResultData } from '../types';
-import { convertPdfToImage, loadPdfJsLib } from './pdfUtils';
+import { convertPdfToImage } from './pdfUtils';
 import { saveFilesToDirectory } from './fileSaver';
 import {
   analyzePDFComplete
 } from './geminiService';
+
+// Cấu hình worker từ CDN để tránh 404 khi deploy
+const PDFJS_VERSION = pdfjsLib.version || '5.4.394';
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
 
 const sanitizeFilePart = (value: string, maxLength: number = 80): string => {
   if (!value) return '';
@@ -80,10 +85,9 @@ export const splitPdfByKeywords = async (
     const inputFileBaseName = sanitizeFilePart(file.name.replace(/\.[^/.]+$/, '')) || 'Document';
 
     const pdfJsBuffer = arrayBuffer.slice(0);
-    const pdfjsLib = await loadPdfJsLib();
-    const getDoc = pdfjsLib?.getDocument;
+    const getDoc = pdfjsLib.getDocument;
     if (!getDoc || typeof getDoc !== 'function') {
-      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình (pdfjs).');
+      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình.');
     }
     // @ts-ignore - getDocument có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
     const loadingTask = getDoc({ data: pdfJsBuffer });

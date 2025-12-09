@@ -1,28 +1,15 @@
-// Dynamic load pdfjs-dist từ CDN để tránh vấn đề bundle trên IIS/Vercel
-export const PDFJS_VERSION = '5.4.394';
-// Dùng gói legacy để tránh lỗi runtime trong môi trường không đủ module support
-export const PDFJS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/legacy/build`;
+// Import pdfjs-dist trực tiếp và trỏ worker lên CDN ổn định
+import * as pdfjsLib from 'pdfjs-dist';
 
-let pdfjsPromise: Promise<any> | null = null;
-export const loadPdfJsLib = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import(/* @vite-ignore */ `${PDFJS_BASE}/pdf.mjs`).then((mod: any) => {
-      const lib = mod?.default ?? mod;
-      if (lib?.GlobalWorkerOptions) {
-        lib.GlobalWorkerOptions.workerSrc = `${PDFJS_BASE}/pdf.worker.mjs`;
-      }
-      return lib;
-    });
-  }
-  return pdfjsPromise;
-};
+const PDFJS_VERSION = pdfjsLib.version || '5.4.394';
+// Dùng build chuẩn (non-legacy). Worker được lấy từ CDN để tránh 404 khi bundle
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
 
 export const convertPdfToImage = async (file: File, maxPages?: number): Promise<string[]> => {
   try {
-    const pdfjsLib = await loadPdfJsLib();
     const getDoc = pdfjsLib?.getDocument;
     if (!getDoc || typeof getDoc !== 'function') {
-      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình (pdfjs).');
+      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình.');
     }
     const arrayBuffer = await file.arrayBuffer();
     // @ts-ignore - getDocument có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
