@@ -1,21 +1,40 @@
-// Import pdfjs-dist
+// Import pdfjs-dist - import trực tiếp các function cần thiết
 // @ts-ignore - pdfjs-dist exports có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
 import * as pdfjsLib from 'pdfjs-dist';
 
+// QUAN TRỌNG: Set worker source ngay sau khi import
 // Set the worker source to a CDN that supports the ES module worker required by pdfjs-dist v5+
 // We use jsdelivr as it reliably hosts the .mjs build artifacts
 // Sử dụng version cố định để tránh lỗi build
 const PDFJS_VERSION = '5.4.394';
 // @ts-ignore - GlobalWorkerOptions có thể không có trong type definitions nhưng tồn tại ở runtime
 if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+  // Force set workerSrc từ CDN - không để pdfjs-dist tự resolve từ build output
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+}
+
+// Extract functions để đảm bảo chúng không bị undefined
+// Sử dụng cách an toàn để extract function
+let getDocument: any;
+try {
+  getDocument = pdfjsLib.getDocument;
+  if (!getDocument) {
+    getDocument = (pdfjsLib as any).getDocument;
+  }
+} catch (e) {
+  console.error('Error extracting getDocument from pdfjs-dist:', e);
 }
 
 export const convertPdfToImage = async (file: File, maxPages?: number): Promise<string[]> => {
   try {
+    // Kiểm tra getDocument có tồn tại không, nếu không thì thử dùng trực tiếp từ pdfjsLib
+    const getDoc = getDocument || pdfjsLib.getDocument || (pdfjsLib as any).getDocument;
+    if (!getDoc || typeof getDoc !== 'function') {
+      throw new Error('pdfjs-dist getDocument không khả dụng. Vui lòng kiểm tra lại cấu hình.');
+    }
     const arrayBuffer = await file.arrayBuffer();
     // @ts-ignore - getDocument có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const loadingTask = getDoc({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
 
     const images: string[] = [];
