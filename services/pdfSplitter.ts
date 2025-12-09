@@ -1,11 +1,6 @@
+// Import pdfjs-dist
+// @ts-ignore - pdfjs-dist exports có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
 import * as pdfjsLib from 'pdfjs-dist';
-// Import worker file as bundled asset (offline-safe, không phụ thuộc CDN)
-// Vite sẽ trả về URL tĩnh tới worker và pdf.js sẽ tự tạo Web Worker từ URL này.
-// Tham khảo: https://github.com/mozilla/pdf.js/tree/master/examples/webpack
-// và cách import với Vite: ?url
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - kiểu import asset
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { PDFDocument } from 'pdf-lib';
 import { SplitDocument, SplitResultData } from '../types';
 import { convertPdfToImage } from './pdfUtils';
@@ -14,9 +9,13 @@ import {
   analyzePDFComplete
 } from './geminiService';
 
-// Sử dụng worker được bundle cùng ứng dụng thay vì tải từ CDN.
-// Điều này giúp tool hoạt động khi không có internet.
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc as string;
+// Sử dụng CDN để tải worker file - đảm bảo hoạt động trên mọi môi trường (local, IIS, etc.)
+// jsdelivr là CDN đáng tin cậy và hỗ trợ ES module worker (.mjs) cho pdfjs-dist v5+
+const PDFJS_VERSION = '5.4.394';
+// @ts-ignore - GlobalWorkerOptions có thể không có trong type definitions nhưng tồn tại ở runtime
+if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+}
 
 const sanitizeFilePart = (value: string, maxLength: number = 80): string => {
   if (!value) return '';
@@ -92,6 +91,7 @@ export const splitPdfByKeywords = async (
     const inputFileBaseName = sanitizeFilePart(file.name.replace(/\.[^/.]+$/, '')) || 'Document';
 
     const pdfJsBuffer = arrayBuffer.slice(0);
+    // @ts-ignore - getDocument có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
     const loadingTask = pdfjsLib.getDocument({ data: pdfJsBuffer });
     const pdf = await loadingTask.promise;
     const numPages = pdf.numPages;

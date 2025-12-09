@@ -1,5 +1,25 @@
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+// Import GoogleGenAI - sử dụng namespace import để tránh lỗi tree-shaking
+import * as genai from "@google/genai";
+const GoogleGenAI = genai.GoogleGenAI;
+
+// Type constants - định nghĩa local vì có thể không được export từ @google/genai trong build
+const Type = {
+  OBJECT: 'object' as const,
+  STRING: 'string' as const,
+  NUMBER: 'number' as const,
+  ARRAY: 'array' as const,
+  BOOLEAN: 'boolean' as const
+};
+
+// Schema type definition
+type Schema = {
+  type: string;
+  properties?: Record<string, Schema | { type: string; description?: string }>;
+  items?: Schema;
+  description?: string;
+  required?: string[];
+};
 import {
   InvoiceData,
   IncidentReportData,

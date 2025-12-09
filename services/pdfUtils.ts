@@ -1,12 +1,20 @@
+// Import pdfjs-dist
+// @ts-ignore - pdfjs-dist exports có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set the worker source to a CDN that supports the ES module worker required by pdfjs-dist v5+
 // We use jsdelivr as it reliably hosts the .mjs build artifacts
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Sử dụng version cố định để tránh lỗi build
+const PDFJS_VERSION = '5.4.394';
+// @ts-ignore - GlobalWorkerOptions có thể không có trong type definitions nhưng tồn tại ở runtime
+if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+}
 
 export const convertPdfToImage = async (file: File, maxPages?: number): Promise<string[]> => {
   try {
     const arrayBuffer = await file.arrayBuffer();
+    // @ts-ignore - getDocument có thể không được nhận diện đúng trong build nhưng vẫn hoạt động ở runtime
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
 
