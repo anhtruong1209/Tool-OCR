@@ -105,7 +105,7 @@ export const syncFilesToDestination = async (
         // Lưu file vào folder đích
         const fileHandle = await targetDir.getFileHandle(doc.filename, { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(pdfBytes);
+        await writable.write(pdfBytes as FileSystemWriteChunkType);
         await writable.close();
         
         console.log(`[FileSync] Synced ${doc.filename} to ${pathParts.join('/')}`);
@@ -132,7 +132,7 @@ export const syncFilesToDestination = async (
           // Lưu file LOG vào folder đích
           const fileHandle = await targetDir.getFileHandle(log.filename, { create: true });
           const writable = await fileHandle.createWritable();
-          await writable.write(pdfBytes);
+          await writable.write(pdfBytes as FileSystemWriteChunkType);
           await writable.close();
           
           console.log(`[FileSync] Synced LOG ${log.filename} to ${pathParts.join('/')}`);

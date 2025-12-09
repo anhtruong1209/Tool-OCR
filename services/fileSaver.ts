@@ -47,7 +47,6 @@ export const canUseFileSystemAccess = (): boolean => {
 export const requestDirectoryPicker = async (): Promise<FileSystemDirectoryHandle | null> => {
   // Check if we can use File System Access API
   if (!canUseFileSystemAccess()) {
-    console.log('[FileSaver] Cannot use File System Access API in cross-origin iframe. ZIP fallback disabled.');
     return null;
   }
 
@@ -66,7 +65,6 @@ export const requestDirectoryPicker = async (): Promise<FileSystemDirectoryHandl
     
     // If cross-origin error, return null to use ZIP fallback
     if (error.message?.includes('Cross origin') || error.message?.includes('sub frames')) {
-      console.log('[FileSaver] Cross-origin error while opening directory picker. ZIP fallback disabled.');
       return null;
     }
     

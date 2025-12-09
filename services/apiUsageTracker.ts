@@ -150,12 +150,6 @@ class ApiUsageTracker {
     const stats = this.getStats();
     const rateLimits = this.checkRateLimits();
     
-    console.log(`[API Tracker] 📊 Usage Summary:
-  Today: ${stats.todayCalls}/${stats.dailyLimit} calls ($${stats.todayCost.toFixed(4)})
-  Current: ${stats.currentRPM}/${stats.rpmLimit} RPM
-  This Month: $${stats.monthCost.toFixed(4)}
-  Remaining: ${stats.remainingCalls} calls today`);
-    
     if (rateLimits.approachingDailyLimit) {
       console.warn(`[API Tracker] ⚠️ Approaching daily limit: ${stats.todayCalls}/${stats.dailyLimit}`);
     }

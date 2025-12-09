@@ -1117,17 +1117,10 @@ OUTPUT JSON (CHỈ JSON, KHÔNG CÓ TEXT GIẢI THÍCH):
     allPages.push(...batchResult.pages);
   }
 
-  console.log(`[Gemini Service] Analysis complete: ${allPages.length} pages, broadcast: ${finalBroadcastCode}, service: ${finalServiceCode}`);
 
   // FINAL VALIDATION: Kiểm tra toàn bộ kết quả và đảm bảo LOG được xử lý đúng
   const logPages = allPages.filter(p => p.isLogPage || p.type === 'LOG_SCREEN');
   const sourceHeaders = allPages.filter(p => p.isBanTinNguonHeader || p.type === 'SOURCE_HEADER');
-  
-  console.log(`[Gemini Service] Validation summary:`);
-  console.log(`  - Total pages: ${allPages.length}`);
-  console.log(`  - LOG pages found: ${logPages.length} (pages: ${logPages.map(p => p.page).join(', ')})`);
-  console.log(`  - SOURCE_HEADER pages found: ${sourceHeaders.length} (pages: ${sourceHeaders.map(p => p.page).join(', ')})`);
-  console.log(`  - FORM_HEADER pages found: ${allPages.filter(p => p.type === 'FORM_HEADER' && p.formCode).length}`);
   
   // Validation: LOG thường xuất hiện sau SOURCE_HEADER
   if (logPages.length > 0 && sourceHeaders.length > 0) {
