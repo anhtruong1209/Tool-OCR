@@ -883,15 +883,19 @@ QUY TẮC PHÂN LOẠI (ÁP DỤNG THEO THỨ TỰ ƯU TIÊN):
    - KTKS.MSI.TC-BM.01, KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03
    → formCode BẮT BUỘC phải có giá trị (không được null)
    - Sau QT.MSI-BM.02, QT.MSI-BM.03 là tương ứng KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03 ( lưu ý kiểm tra mã số tránh trường hợp 1 file cắt bao gồm cả QT và KTKS)
-   
+   - Lưu ý  QT.MSI-BM.04 có thể xuất hiện 2 lần dựa vào serviceHint
+
 2. LOG_SCREEN: Trang chứa ảnh chụp màn hình (Total Commander, FileZilla, email client, hoặc bất kỳ giao diện phần mềm nào)
    - Đặc điểm: Chủ yếu là ảnh, không có text quan trọng, không có formCode
    - Có thể có email address, file path, hoặc timestamp
    → formCode BẮT BUỘC = null, isLogPage = true
    
-3. SOURCE_HEADER: Trang đầu tiên của bản tin nguồn, có header "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" hoặc tương tự
+3. SOURCE_HEADER: Trang đầu tiên của bản tin nguồn, có header "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" hoặc "Cộng hòa xã hội chủ nghĩa Việt Nam"
+   - QUAN TRỌNG: Trang có thể XOAY NGANG (landscape orientation), vẫn phải detect được
+   - Có thể có Tên tiếng Anh ở đầu (ví dụ: "MARINE WEATHER FORECAST", "NATIONAL CENTER FOR HYDRO-METEOROLOGICAL FORECASTING")
    - KHÔNG có formCode (không có khung "Mã số" ở góc)
    - Có thể có tiêu đề bản tin, ngày tháng, địa danh
+   - Có thể có bảng dự báo thời tiết biển
    → formCode = null, isBanTinNguonHeader = true
    
 4. CONTENT: Tất cả các trang còn lại (nội dung tiếp theo của biểu mẫu hoặc bản tin)
@@ -901,10 +905,7 @@ QUY TẮC TRÍCH XUẤT formCode (QUAN TRỌNG - PHẢI TUÂN THỦ):
 - CHỈ lấy từ khung "Mã số" hoặc "Code" ở góc trên phải/bên phải
 - Phải trích xuất CHÍNH XÁC, không thêm bớt ký tự
 - Các mã phổ biến: QT.MSI-BM.01, QT.MSI-BM.02, QT.MSI-BM.03, QT.MSI-BM.04, KTKS.MSI.TC-BM.01, KTKS.MSI.TC-BM.02, KTKS.MSI.TC-BM.03
-- QUAN TRỌNG: Mỗi trang có khung "Mã số" PHẢI được đánh dấu là FORM_HEADER và có formCode
 - Nếu KHÔNG thấy khung "Mã số" → formCode = null
-- LƯU Ý: Một document có thể có nhiều trang, nhưng CHỈ trang đầu có formCode. Các trang tiếp theo (CONTENT) không có formCode.
-- QUAN TRỌNG: Nếu thấy trang có khung "Mã số" với mã KHÁC với mã ở trang trước → đó là trang đầu của document MỚI, PHẢI đánh dấu là FORM_HEADER
 
 QUY TẮC XÁC ĐỊNH LOG_SCREEN (QUAN TRỌNG):
 - Trang LOG thường xuất hiện SAU SOURCE_HEADER (bản tin nguồn)

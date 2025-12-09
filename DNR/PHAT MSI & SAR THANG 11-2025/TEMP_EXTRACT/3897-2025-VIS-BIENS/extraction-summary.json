@@ -1,138 +1,138 @@
 {
   "originalFileName": "3897-2025-VIS-BIENS.pdf",
-  "broadcastCode": "SAR",
+  "broadcastCode": "WX",
   "serviceCode": "RTP",
-  "generatedAt": "2025-12-09T02:32:06.175Z",
+  "generatedAt": "2025-12-09T03:33:29.785Z",
   "documents": [
     {
-      "id": "tlmw8mo00",
+      "id": "1tooqz1kj",
       "filename": "3897-2025-VIS-BIENS - QT.MSI-BM.01.pdf",
       "code": "QT.MSI-BM.01",
       "serviceCode": "RTP",
       "startPage": 1,
       "endPage": 1,
       "pageCount": 1,
-      "recommendedPath": "COVER/COVER/SAR"
+      "recommendedPath": "COVER/COVER/WX"
     },
     {
-      "id": "r85378wko",
+      "id": "7ylydgc2t",
       "filename": "3897-2025-VIS-BIENS - KTKS.MSI.TC-BM.01.pdf",
       "code": "KTKS.MSI.TC-BM.01",
       "serviceCode": "RTP",
       "startPage": 2,
       "endPage": 2,
       "pageCount": 1,
-      "recommendedPath": "COVER/KTKSTC BM 01/SAR"
+      "recommendedPath": "COVER/KTKSTC BM 01/WX"
     },
     {
-      "id": "hxmclunp1",
+      "id": "y6aipin4v",
       "filename": "3897-2025-VIS-BIENS.pdf",
       "code": null,
       "serviceCode": "RTP",
       "startPage": 3,
       "endPage": 4,
       "pageCount": 2,
-      "recommendedPath": "BAN TIN NGUON/SAR"
+      "recommendedPath": "BAN TIN NGUON/WX"
     },
     {
-      "id": "gdgz7ed9x",
+      "id": "hfhxdas17",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "serviceCode": "RTP",
       "startPage": 6,
       "endPage": 8,
       "pageCount": 3,
-      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/SAR"
+      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/WX"
     },
     {
-      "id": "0cpdz8rlk",
+      "id": "chtbo3h6q",
       "filename": "3897-2025-VIS-BIENS - RTP - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "serviceCode": "RTP",
       "startPage": 9,
       "endPage": 9,
       "pageCount": 1,
-      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/SAR"
+      "recommendedPath": "DICH VU RTP/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/WX"
     },
     {
-      "id": "nrcr2hfs5",
+      "id": "4ppe9jwzj",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "serviceCode": "RTP",
       "startPage": 10,
       "endPage": 12,
       "pageCount": 3,
-      "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/SAR"
+      "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/WX"
     },
     {
-      "id": "m4hupc2yi",
+      "id": "z1u5kaxbe",
       "filename": "3897-2025-VIS-BIENS - RTP - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "serviceCode": "RTP",
       "startPage": 13,
       "endPage": 13,
       "pageCount": 1,
-      "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/SAR"
+      "recommendedPath": "DICH VU RTP/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/WX"
     },
     {
-      "id": "t7k0hfytw",
+      "id": "cszlqrssg",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.04.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "RTP",
       "startPage": 14,
       "endPage": 14,
       "pageCount": 1,
-      "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/SAR"
+      "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/WX"
     },
     {
-      "id": "ogyeprj6u",
+      "id": "8c031ht7k",
       "filename": "3897-2025-VIS-BIENS - RTP - QT.MSI-BM.04 - p15.pdf",
       "code": "QT.MSI-BM.04",
       "serviceCode": "RTP",
       "startPage": 15,
       "endPage": 15,
       "pageCount": 1,
-      "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/SAR"
+      "recommendedPath": "DICH VU RTP/KIEM TRA KIEM SOAT SAU PHAT/WX"
     },
     {
-      "id": "cerviabtl",
+      "id": "67612ilhp",
       "filename": "3897-2025-VIS-BIENS - NTX - QT.MSI-BM.02.pdf",
       "code": "QT.MSI-BM.02",
       "serviceCode": "NTX",
       "startPage": 16,
       "endPage": 18,
       "pageCount": 3,
-      "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/SAR"
+      "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/BAN TIN NGUON DA DUOC XU LY/WX"
     },
     {
-      "id": "qs8davxab",
+      "id": "uf2ggckuc",
       "filename": "3897-2025-VIS-BIENS - NTX - KTKS.MSI.TC-BM.02.pdf",
       "code": "KTKS.MSI.TC-BM.02",
       "serviceCode": "NTX",
       "startPage": 19,
       "endPage": 19,
       "pageCount": 1,
-      "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/SAR"
+      "recommendedPath": "DICH VU NTX/BAN TIN NGUON DA DUOC XU LY/KTKSTC BAN TIN NGUON DA DUOC XU LY/WX"
     },
     {
-      "id": "rq5yh2ngn",
+      "id": "lt9yqxv4g",
       "filename": "3897-2025-VIS-BIENS - NTX - QT.MSI-BM.03.pdf",
       "code": "QT.MSI-BM.03",
       "serviceCode": "NTX",
       "startPage": 20,
       "endPage": 24,
       "pageCount": 5,
-      "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/SAR"
+      "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/BAN TIN XU LY TRUOC KHI PHAT/WX"
     },
     {
-      "id": "0lprubbss",
+      "id": "5kv131j95",
       "filename": "3897-2025-VIS-BIENS - NTX - KTKS.MSI.TC-BM.03.pdf",
       "code": "KTKS.MSI.TC-BM.03",
       "serviceCode": "NTX",
       "startPage": 25,
       "endPage": 25,
       "pageCount": 1,
-      "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/SAR"
+      "recommendedPath": "DICH VU NTX/BAN TIN XU LY PHAT/KTKSTC BAN TIN XU LY TRUOC KHI PHAT/WX"
     }
   ],
   "logs": [
@@ -144,7 +144,7 @@
     }
   ],
   "analysis": {
-    "broadcastCode": "SAR",
+    "broadcastCode": "WX",
     "serviceCode": "RTP",
     "pages": [
       {
@@ -152,7 +152,7 @@
         "type": "FORM_HEADER",
         "formCode": "QT.MSI-BM.01",
         "serviceHint": "RTP",
-        "broadcastCode": "SAR",
+        "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -163,7 +163,7 @@
         "type": "FORM_HEADER",
         "formCode": "KTKS.MSI.TC-BM.01",
         "serviceHint": "RTP",
-        "broadcastCode": "SAR",
+        "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -174,7 +174,7 @@
         "type": "SOURCE_HEADER",
         "formCode": null,
         "serviceHint": null,
-        "broadcastCode": "MET",
+        "broadcastCode": "WX",
         "hasSignature": false,
         "isLogPage": false,
         "isBanTinNguonHeader": true,
@@ -185,8 +185,8 @@
         "type": "CONTENT",
         "formCode": null,
         "serviceHint": null,
-        "broadcastCode": "MET",
-        "hasSignature": false,
+        "broadcastCode": "WX",
+        "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false
@@ -207,8 +207,8 @@
         "type": "FORM_HEADER",
         "formCode": "QT.MSI-BM.02",
         "serviceHint": "RTP",
-        "broadcastCode": "SAR",
-        "hasSignature": false,
+        "broadcastCode": "WX",
+        "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false
@@ -217,8 +217,8 @@
         "page": 7,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "RTP",
-        "broadcastCode": "MET",
+        "serviceHint": null,
+        "broadcastCode": "WX",
         "hasSignature": false,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -228,8 +228,8 @@
         "page": 8,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "RTP",
-        "broadcastCode": "MET",
+        "serviceHint": null,
+        "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -240,7 +240,7 @@
         "type": "FORM_HEADER",
         "formCode": "KTKS.MSI.TC-BM.02",
         "serviceHint": "RTP",
-        "broadcastCode": "SAR",
+        "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -251,8 +251,8 @@
         "type": "FORM_HEADER",
         "formCode": "QT.MSI-BM.03",
         "serviceHint": "RTP",
-        "broadcastCode": "SAR",
-        "hasSignature": false,
+        "broadcastCode": "WX",
+        "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
         "hasEmail": false
@@ -261,8 +261,8 @@
         "page": 11,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "RTP",
-        "broadcastCode": "MET",
+        "serviceHint": null,
+        "broadcastCode": "WX",
         "hasSignature": false,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -272,8 +272,8 @@
         "page": 12,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "RTP",
-        "broadcastCode": "MET",
+        "serviceHint": null,
+        "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -284,7 +284,7 @@
         "type": "FORM_HEADER",
         "formCode": "KTKS.MSI.TC-BM.03",
         "serviceHint": "RTP",
-        "broadcastCode": "SAR",
+        "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -350,7 +350,7 @@
         "type": "FORM_HEADER",
         "formCode": "KTKS.MSI.TC-BM.02",
         "serviceHint": "NTX",
-        "broadcastCode": "WX",
+        "broadcastCode": "MSI",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,
@@ -360,7 +360,7 @@
         "page": 20,
         "type": "FORM_HEADER",
         "formCode": "QT.MSI-BM.03",
-        "serviceHint": "NTX",
+        "serviceHint": "NAVTEX",
         "broadcastCode": "WX",
         "hasSignature": false,
         "isLogPage": false,
@@ -371,7 +371,7 @@
         "page": 21,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "NTX",
+        "serviceHint": "NAVTEX",
         "broadcastCode": "WX",
         "hasSignature": false,
         "isLogPage": false,
@@ -382,7 +382,7 @@
         "page": 22,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "NTX",
+        "serviceHint": "NAVTEX",
         "broadcastCode": "WX",
         "hasSignature": false,
         "isLogPage": false,
@@ -393,7 +393,7 @@
         "page": 23,
         "type": "CONTENT",
         "formCode": null,
-        "serviceHint": "NTX",
+        "serviceHint": "NAVTEX",
         "broadcastCode": "WX",
         "hasSignature": true,
         "isLogPage": false,
@@ -405,7 +405,7 @@
         "type": "FORM_HEADER",
         "formCode": "KTKS.MSI.TC-BM.03",
         "serviceHint": "NTX",
-        "broadcastCode": "WX",
+        "broadcastCode": "MSI",
         "hasSignature": true,
         "isLogPage": false,
         "isBanTinNguonHeader": false,

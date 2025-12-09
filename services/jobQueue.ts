@@ -7,6 +7,7 @@ export interface Job {
   file: File;
   status: 'pending' | 'processing' | 'completed' | 'error';
   progress: number;
+  statusMessage?: string; // Thông báo trạng thái hiện tại
   result?: SplitResultData;
   error?: string;
   startTime?: number;
@@ -148,18 +149,36 @@ class JobQueue {
       this.notify();
 
       // Simulate progress updates during processing
-      const progressInterval = setInterval(() => {
-        if (job.progress < 90) {
+      // Sử dụng requestAnimationFrame để tránh bị pause khi tab không active
+      let lastUpdateTime = Date.now();
+      let progressAnimationFrameId: number | null = null;
+      let isProcessing = true;
+      
+      const progressUpdate = () => {
+        if (!isProcessing) return;
+        
+        const now = Date.now();
+        // Chỉ update mỗi 1 giây để tránh spam
+        if (now - lastUpdateTime >= 1000 && job.progress < 90) {
           job.progress = Math.min(job.progress + 2, 90);
           this.notify();
+          lastUpdateTime = now;
         }
-      }, 1000);
+        if (job.status === 'processing' && job.progress < 90 && isProcessing) {
+          progressAnimationFrameId = requestAnimationFrame(progressUpdate);
+        }
+      };
+      progressAnimationFrameId = requestAnimationFrame(progressUpdate);
 
       try {
         // Process the file with root directory handle
         const result = await splitPdfByKeywords(job.file, job.rootDirHandle, "Mã số");
         
-        clearInterval(progressInterval);
+        // Stop progress updates
+        isProcessing = false;
+        if (progressAnimationFrameId !== null) {
+          cancelAnimationFrame(progressAnimationFrameId);
+        }
 
         // Success
         job.status = 'completed';
@@ -172,7 +191,11 @@ class JobQueue {
         // Process next job
         this.processNext();
       } catch (processError) {
-        clearInterval(progressInterval);
+        // Stop progress updates
+        isProcessing = false;
+        if (progressAnimationFrameId !== null) {
+          cancelAnimationFrame(progressAnimationFrameId);
+        }
         throw processError;
       }
 
