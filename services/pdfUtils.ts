@@ -1,14 +1,15 @@
 // Dynamic load pdfjs-dist từ CDN để tránh vấn đề bundle trên IIS/Vercel
 export const PDFJS_VERSION = '5.4.394';
-export const PDFJS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build`;
+// Dùng gói legacy để tránh lỗi runtime trong môi trường không đủ module support
+export const PDFJS_BASE = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/legacy/build`;
 
 let pdfjsPromise: Promise<any> | null = null;
 export const loadPdfJsLib = async () => {
   if (!pdfjsPromise) {
-    pdfjsPromise = import(/* @vite-ignore */ `${PDFJS_BASE}/pdf.min.mjs`).then((mod: any) => {
+    pdfjsPromise = import(/* @vite-ignore */ `${PDFJS_BASE}/pdf.mjs`).then((mod: any) => {
       const lib = mod?.default ?? mod;
       if (lib?.GlobalWorkerOptions) {
-        lib.GlobalWorkerOptions.workerSrc = `${PDFJS_BASE}/pdf.worker.min.mjs`;
+        lib.GlobalWorkerOptions.workerSrc = `${PDFJS_BASE}/pdf.worker.mjs`;
       }
       return lib;
     });
