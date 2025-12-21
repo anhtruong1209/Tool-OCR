@@ -1,5 +1,5 @@
 
-export type DocumentType = 'INVOICE' | 'INCIDENT' | 'SPLIT';
+export type DocumentType = 'INVOICE' | 'INCIDENT' | 'SPLIT' | 'OCR';
 
 // --- INVOICE TYPES ---
 export interface InvoiceItem {
@@ -226,7 +226,29 @@ export interface SplitResultData {
   extractionSummary?: any; // JSON metadata used for routing
 }
 
-export type DocumentData = InvoiceData | IncidentReportData | SplitResultData;
+// --- OCR TYPES ---
+export interface TextBlock {
+  text: string;
+  x: number;        // X coordinate (0-1 normalized)
+  y: number;        // Y coordinate (0-1 normalized)
+  width: number;    // Width (0-1 normalized)
+  height: number;   // Height (0-1 normalized)
+  confidence?: number; // Confidence score (0-1)
+}
+
+export interface OCRPageResult {
+  page: number;
+  textBlocks: TextBlock[];
+  fullText: string; // Full extracted text
+}
+
+export interface OCRData {
+  type: 'OCR';
+  pages: OCRPageResult[];
+  totalPages: number;
+}
+
+export type DocumentData = InvoiceData | IncidentReportData | SplitResultData | OCRData;
 
 export enum ProcessingStatus {
   IDLE = 'IDLE',

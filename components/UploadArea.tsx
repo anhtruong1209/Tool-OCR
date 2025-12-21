@@ -100,7 +100,7 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
         </div>
         <div>
           <p className="text-lg font-semibold text-slate-800">
-            {multiple ? 'Tải lên nhiều file PDF' : 'Tải lên hóa đơn PDF'}
+            {multiple ? 'Tải lên nhiều file PDF' : 'Tải lên file PDF'}
           </p>
           <p className="text-sm text-slate-600 mt-1">
             {multiple

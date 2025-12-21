@@ -8,7 +8,10 @@ import {
   PageCodeResult,
   BanTinNguonKeywords,
   PDFAnalysisResult,
-  PageAnalysis
+  PageAnalysis,
+  OCRData,
+  TextBlock,
+  OCRPageResult
 } from '../types';
 
 // --- BAN TIN NGUON KEYWORDS CONFIG ---
@@ -1136,4 +1139,193 @@ OUTPUT JSON (CHỈ JSON, KHÔNG CÓ TEXT GIẢI THÍCH):
     serviceCode: finalServiceCode,
     pages: allPages
   };
+};
+
+// ============================================
+// OCR WITH BOUNDING BOXES FUNCTION
+// ============================================
+
+/**
+ * OCR tài liệu với bounding boxes để hiển thị text và vị trí
+ * @param base64Images - Array of base64 encoded images
+ * @returns OCRData với text blocks và bounding boxes
+ */
+export const performOCRWithBoundingBoxes = async (
+  base64Images: string[]
+): Promise<OCRData> => {
+  if (!process.env.API_KEY) {
+    throw new Error("API Key chưa được cấu hình. Vui lòng kiểm tra lại.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const model = 'gemini-2.5-flash';
+
+  // Schema cho OCR result với bounding boxes - gửi tất cả trang trong 1 lần
+  const ocrSchema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+      pages: {
+        type: Type.ARRAY,
+        description: "Danh sách kết quả OCR cho từng trang",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            pageNumber: {
+              type: Type.NUMBER,
+              description: "Số thứ tự trang (bắt đầu từ 1)"
+            },
+            textBlocks: {
+              type: Type.ARRAY,
+              description: "Danh sách các khối text được phát hiện với vị trí và kích thước",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  text: {
+                    type: Type.STRING,
+                    description: "Nội dung text được nhận diện"
+                  },
+                  x: {
+                    type: Type.NUMBER,
+                    description: "Tọa độ X của góc trên bên trái (0-1, normalized)"
+                  },
+                  y: {
+                    type: Type.NUMBER,
+                    description: "Tọa độ Y của góc trên bên trái (0-1, normalized)"
+                  },
+                  width: {
+                    type: Type.NUMBER,
+                    description: "Chiều rộng của bounding box (0-1, normalized)"
+                  },
+                  height: {
+                    type: Type.NUMBER,
+                    description: "Chiều cao của bounding box (0-1, normalized)"
+                  },
+                  confidence: {
+                    type: Type.NUMBER,
+                    description: "Độ tin cậy của nhận diện (0-1)"
+                  }
+                },
+                required: ["text", "x", "y", "width", "height"]
+              }
+            },
+            fullText: {
+              type: Type.STRING,
+              description: "Toàn bộ text được trích xuất từ trang"
+            }
+          },
+          required: ["pageNumber", "textBlocks", "fullText"]
+        }
+      }
+    },
+    required: ["pages"]
+  };
+
+  const ocrPrompt = `Bạn là một hệ thống OCR chuyên nghiệp. Nhiệm vụ của bạn là:
+
+1. **Nhận diện tất cả text** trong TẤT CẢ các hình ảnh được cung cấp với độ chính xác cao
+2. **Xác định vị trí chính xác** của mỗi khối text bằng bounding box (tọa độ normalized 0-1)
+3. **Trích xuất toàn bộ nội dung** text từ mỗi trang
+
+**Quy tắc:**
+- Mỗi khối text (word hoặc phrase) phải có bounding box riêng
+- Tọa độ được normalize về khoảng [0, 1] (0 = đầu trang/trái, 1 = cuối trang/phải)
+- Ưu tiên nhóm các từ gần nhau thành một khối text
+- Giữ nguyên định dạng và cấu trúc của văn bản
+- fullText chứa toàn bộ text đã được trích xuất từ trang đó, giữ nguyên thứ tự và xuống dòng
+- Trả về mảng "pages" với mỗi phần tử tương ứng với từng hình ảnh theo thứ tự (pageNumber bắt đầu từ 1)
+
+**Ví dụ bounding box:**
+- Text ở góc trên bên trái: x=0.1, y=0.1, width=0.3, height=0.05
+- Text ở giữa trang: x=0.2, y=0.5, width=0.6, height=0.1
+
+Trả về JSON với cấu trúc đã định nghĩa, bao gồm tất cả các trang.`;
+
+  try {
+    // Gửi tất cả các trang trong một lần gọi API
+    const contentParts = base64Images.map((image, index) => ({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: image,
+      },
+    }));
+    
+    contentParts.push({ text: ocrPrompt } as any);
+
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: {
+        parts: contentParts,
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: ocrSchema,
+        temperature: 0,
+      },
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) {
+      throw new Error("Gemini không trả về dữ liệu.");
+    }
+
+    const allPagesData = JSON.parse(jsonText);
+    const results: OCRPageResult[] = [];
+
+    // Xử lý kết quả từ API
+    if (allPagesData.pages && Array.isArray(allPagesData.pages)) {
+      for (let i = 0; i < allPagesData.pages.length; i++) {
+        const pageData = allPagesData.pages[i];
+        const pageNum = pageData.pageNumber || (i + 1);
+        
+        // Validate và normalize bounding boxes
+        const textBlocks: TextBlock[] = (pageData.textBlocks || []).map((block: any) => ({
+          text: block.text || '',
+          x: Math.max(0, Math.min(1, block.x || 0)),
+          y: Math.max(0, Math.min(1, block.y || 0)),
+          width: Math.max(0, Math.min(1, block.width || 0)),
+          height: Math.max(0, Math.min(1, block.height || 0)),
+          confidence: block.confidence ? Math.max(0, Math.min(1, block.confidence)) : undefined,
+        }));
+
+        results.push({
+          page: pageNum,
+          textBlocks,
+          fullText: pageData.fullText || '',
+        });
+      }
+    }
+
+    // Đảm bảo có đủ số lượng trang (nếu API trả về thiếu)
+    while (results.length < base64Images.length) {
+      results.push({
+        page: results.length + 1,
+        textBlocks: [],
+        fullText: '',
+      });
+    }
+
+    // Sắp xếp theo page number để đảm bảo thứ tự đúng
+    results.sort((a, b) => a.page - b.page);
+
+    return {
+      type: 'OCR',
+      pages: results,
+      totalPages: base64Images.length,
+    };
+  } catch (error) {
+    console.error(`[OCR] Error processing all pages:`, error);
+    // Fallback: trả về empty results cho tất cả trang
+    const fallbackResults: OCRPageResult[] = base64Images.map((_, index) => ({
+      page: index + 1,
+      textBlocks: [],
+      fullText: '',
+    }));
+    
+    return {
+      type: 'OCR',
+      pages: fallbackResults,
+      totalPages: base64Images.length,
+    };
+  }
+
 };
