@@ -315,7 +315,7 @@ const OverviewSection: React.FC = () => {
           <div className="glass-light rounded-lg p-5 border border-slate-200">
             <h3 className="font-bold text-slate-900 mb-3 text-lg">Bối cảnh thực tế:</h3>
             <p className="leading-relaxed mb-3">
-              Theo quy định của <strong className="text-blue-700">Phòng Điều Hành Mạng</strong>, hồ sơ MSI scan lưu mềm 
+              Theo quy định của <strong className="text-blue-700">Công ty</strong>, hồ sơ MSI scan lưu mềm 
               phải tách ra lưu trữ theo từng biểu mẫu. Hiện tại, quy trình scan và lưu trữ hồ sơ tốn nhiều nhân lực do phải 
               <strong className="text-red-600"> scan lẻ từng loại biểu mẫu</strong>, mất nhiều thời gian.
             </p>
