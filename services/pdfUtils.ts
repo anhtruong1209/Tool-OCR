@@ -19,8 +19,8 @@ export const convertPdfToImage = async (file: File, maxPages?: number): Promise<
     for (let i = 1; i <= maxPagesToConvert; i++) {
       const page = await pdf.getPage(i);
 
-      // Increased scale to 2.5 to better handle SCANNED documents and small text
-      const scale = 2.5; 
+      // Tăng resolution lên 3.0 để AI nhận diện biểu mẫu chính xác hơn (User requested 2.5 - 3.0)
+      const scale = 3.0;
       const viewport = page.getViewport({ scale });
 
       const canvas = document.createElement('canvas');
@@ -44,11 +44,11 @@ export const convertPdfToImage = async (file: File, maxPages?: number): Promise<
       // Convert canvas to base64 string. 
       // Quality 0.9 ensures details in SCANNED files are preserved.
       const base64String = canvas.toDataURL('image/jpeg', 0.9);
-      
+
       // Remove the data URL prefix to get raw base64
       images.push(base64String.split(',')[1]);
     }
-    
+
     return images;
   } catch (error) {
     console.error('Error converting PDF to image:', error);

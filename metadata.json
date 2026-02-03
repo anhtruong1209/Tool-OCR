@@ -1,5 +1,5 @@
 {
   "name": "VISHIPEL AI - OCR & Data Extraction",
-  "description": "Ứng dụng hỗ trợ tự động trích xuất dữ liệu từ tài liệu PDF bằng công nghệ Gemini 2.5 Flash.",
+  "description": "Ứng dụng hỗ trợ tự động trích xuất dữ liệu từ tài liệu PDF bằng công nghệ Gemini 2.0 Flash.",
   "requestFramePermissions": []
 }

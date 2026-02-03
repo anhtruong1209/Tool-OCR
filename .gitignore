@@ -1,6 +1,9 @@
 # Logs
 logs
 *.log
+/test1
+/test2
+/DNR
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -24,3 +27,4 @@ dist-ssr
 *.sw?
 .vercel
 *.rar
+*.pdf
